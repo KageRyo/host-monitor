@@ -5,12 +5,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
 const os = require('node:os');
+// Serve a fixed asset allowlist. Request paths never become filesystem paths.
+const assets = new Map();
+for (const [prefix, folder] of [['/host-monitor/', 'demo-dist'], ['/', 'public']]) {
+  const html = fs.readFileSync(path.join(root, folder, 'index.html'));
+  const js = fs.readFileSync(path.join(root, folder, 'demo.js'));
+  assets.set(prefix, { type: 'text/html', body: html });
+  assets.set(`${prefix}index.html`, { type: 'text/html', body: html });
+  assets.set(`${prefix}demo.js`, { type: 'text/javascript', body: js });
+}
 const server = http.createServer((req, res) => {
-  const pathname = new URL(req.url, 'http://localhost').pathname;
-  const file = pathname.startsWith('/host-monitor/') ? path.join(root, 'demo-dist', pathname.slice('/host-monitor/'.length) || 'index.html') : path.join(root, 'public', pathname.slice(1) || 'index.html');
-  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); return; }
-  res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/html');
-  res.end(fs.readFileSync(file));
+  const asset = assets.get(new URL(req.url, 'http://localhost').pathname);
+  if (!asset) { res.writeHead(404); res.end(); return; }
+  res.setHeader('Content-Type', asset.type);
+  res.end(asset.body);
 });
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

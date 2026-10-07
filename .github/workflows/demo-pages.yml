@@ -23,9 +23,9 @@ jobs:
         with:
           node-version: '22'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Install test browser
-        run: npx playwright install --with-deps chromium
+        run: npm run browser:install -- --with-deps
       - name: Test demo transport
         run: npm test
       - name: Check backend syntax

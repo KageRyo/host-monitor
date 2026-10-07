@@ -31,7 +31,7 @@ You need Node.js 18 or newer, npm, and a working system `ping` command. The Bash
 ```bash
 git clone https://github.com/KageRyo/host-monitor.git
 cd host-monitor
-npm ci --omit=dev
+npm ci --omit=dev --ignore-scripts
 npm start
 ```
 
@@ -143,8 +143,8 @@ npm start
 `npm test` runs the demo transport tests using Node.js's built-in test runner. They cover synthetic status totals, host management, IPv4 validation, persistence, history limits, category ordering, reset, malformed requests, and unavailable storage. Browser verification requires Node.js 20 or newer. The browser check covers rendering under the Pages subpath, host management, filtering, themes, persistence, manual and automatic checks, category ordering, reset, mobile layout, disabled storage, and the normal API transport:
 
 ```bash
-npm ci
-npx playwright install chromium
+npm ci --ignore-scripts
+npm run browser:install
 npm run test:browser
 ```
 

@@ -31,7 +31,7 @@
 ```bash
 git clone https://github.com/KageRyo/host-monitor.git
 cd host-monitor
-npm ci --omit=dev
+npm ci --omit=dev --ignore-scripts
 npm start
 ```
 
@@ -137,8 +137,8 @@ npm start
 `npm test` 使用 Node.js 內建測試工具，驗證模擬狀態統計、主機管理、IPv4 驗證、資料保存、歷史上限、類別排序、重設、錯誤請求與停用儲存情境。瀏覽器測試需要 Node.js 20 以上，涵蓋 Pages 子路徑、主機管理、篩選、主題、資料保存、手動與自動檢查、類別排序、重設、手機版面、停用儲存及一般 API 模式：
 
 ```bash
-npm ci
-npx playwright install chromium
+npm ci --ignore-scripts
+npm run browser:install
 npm run test:browser
 ```
 

@@ -7,7 +7,8 @@
     "start": "node server.js",
     "test": "node --test",
     "build:demo": "node scripts/build-demo.js",
-    "test:browser": "npm run build:demo && node scripts/verify-demo-browser.cjs"
+    "test:browser": "npm run build:demo && node scripts/verify-demo-browser.cjs",
+    "browser:install": "playwright install chromium"
   },
   "keywords": [
     "uptime",
