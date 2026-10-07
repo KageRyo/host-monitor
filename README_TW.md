@@ -31,7 +31,7 @@
 ```bash
 git clone https://github.com/KageRyo/host-monitor.git
 cd host-monitor
-npm install
+npm ci --omit=dev
 npm start
 ```
 
@@ -98,11 +98,30 @@ pm2 startup
 
 依 `pm2 startup` 印出的指令完成系統啟動設定。
 
-## GitHub Pages demo 可行性
+## 互動 Demo
 
-[GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages) 可託管 HTML、CSS 與 JavaScript。互動 demo 可以沿用儀表板，以虛構主機與模擬檢查結果展示卡片、心跳、篩選、主題、主機管理與類別排序；明確標示為模擬資料，編輯結果保留在訪客瀏覽器。
+靜態 demo 沿用現有儀表板，提供八台虛構主機、上線／離線狀態與每 30 秒一次的模擬檢查。可以新增、編輯、刪除主機、手動檢查、排序類別、篩選狀態與切換主題。**不會連線到輸入的位址**，頁面上方有明確的模擬資料提示。
 
-真正的 ping 與 Node.js API 仍需自架後端。目前尚未加入 Pages demo 或部署 workflow；單獨發布現有 `public/` 會讓 `/api/...` 請求失去後端。
+變更以獨立的 localStorage key 保存在訪客瀏覽器，按「重設 Demo」可還原範例。停用瀏覽器儲存時仍可操作，但重新整理會重設。樣式、圖示與字型仍透過外部 CDN 載入。
+
+不需安裝後端依賴即可建置與預覽：
+
+```bash
+npm run build:demo
+python3 -m http.server 8080 --directory demo-dist
+```
+
+開啟 `http://localhost:8080`。自架服務也可透過 `http://localhost:3000/?demo=1` 使用模擬模式；一般網址使用真正的後端 API。
+
+### 發布到 GitHub Pages
+
+[Demo Pages workflow](.github/workflows/demo-pages.yml) 在 PR 中執行測試與建置；推送到 `main` 或在 `main` 手動執行時，只發布產生的前端檔案。
+
+1. 到專案 **Settings → Pages**，將 Source 設為 **GitHub Actions**。
+2. 將 demo 變更合併到 `main`；若已合併，可在 **Actions → Demo Pages → Run workflow** 選擇 `main` 手動執行。
+3. 部署成功後開啟 [demo](https://kageryo.github.io/host-monitor/)。
+
+網址會在啟用 Pages 且首次部署成功後可用。設定細節見 [GitHub 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。真正的 ICMP 檢查與 Node.js API 仍需自架後端。
 
 ## 開發
 
@@ -110,11 +129,20 @@ pm2 startup
 
 ```bash
 npm install
+npm test
 node --check server.js
 npm start
 ```
 
-目前沒有自動化測試套件。修改後請檢查主機新增、編輯、刪除、手動檢查、篩選、主題切換及重啟後的資料保存。
+`npm test` 使用 Node.js 內建測試工具，驗證模擬狀態統計、主機管理、IPv4 驗證、資料保存、歷史上限、類別排序、重設、錯誤請求與停用儲存情境。瀏覽器測試需要 Node.js 20 以上，涵蓋 Pages 子路徑、主機管理、篩選、主題、資料保存、手動與自動檢查、類別排序、重設、手機版面、停用儲存及一般 API 模式：
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:browser
+```
+
+若使用現有 Chrome，可設定 `CHROME_PATH` 為執行檔位置，省略安裝 Chromium。真正的 ping 行為需以自架服務與可達目標驗證。
 
 ## License
 

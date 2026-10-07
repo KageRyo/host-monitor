@@ -31,7 +31,7 @@ You need Node.js 18 or newer, npm, and a working system `ping` command. The Bash
 ```bash
 git clone https://github.com/KageRyo/host-monitor.git
 cd host-monitor
-npm install
+npm ci --omit=dev
 npm start
 ```
 
@@ -104,13 +104,30 @@ pm2 startup
 
 Follow the command printed by `pm2 startup` to configure startup on your system.
 
-## GitHub Pages demo feasibility
+## Interactive demo
 
-A public interactive demo can run on [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages), which hosts static HTML, CSS, and JavaScript. The Node.js API and system ping checks still require a self-hosted server.
+The static demo reuses the dashboard with eight synthetic hosts, mixed online/offline states, and simulated checks every 30 seconds. You can add, edit, and delete hosts, run manual checks, reorder categories, filter statuses, and switch themes. **No entered address is contacted.** A visible banner distinguishes the demo from a real monitoring deployment.
 
-The recommended demo would reuse the dashboard with synthetic hosts and simulated checks, clearly label the data as simulated, and keep demo edits in the visitor's browser. It could demonstrate status cards, heartbeat history, filtering, themes, host management, and category ordering without a backend.
+Demo changes are saved in the visitor's browser using a separate localStorage key. **重設 Demo** (Reset demo) restores the sample hosts. If browser storage is unavailable, the demo works in memory and resets on reload. Styling, icons, and fonts still load from external CDNs.
 
-A Pages demo and deployment workflow are not included yet. Publishing the existing `public/` directory alone would leave its `/api/...` requests without a backend.
+Build and preview without installing backend dependencies:
+
+```bash
+npm run build:demo
+python3 -m http.server 8080 --directory demo-dist
+```
+
+Open `http://localhost:8080`. For a self-hosted installation, `http://localhost:3000/?demo=1` also opens the simulation; opening the normal URL uses the real API.
+
+### Publish on GitHub Pages
+
+The [Demo Pages workflow](.github/workflows/demo-pages.yml) tests and builds the demo on pull requests. It publishes only the generated frontend assets on a push to `main` or a manual run on `main`.
+
+1. In the repository, open **Settings → Pages** and select **GitHub Actions** as the source.
+2. Merge the demo change into `main`, or run **Actions → Demo Pages → Run workflow** on `main` if it is already merged.
+3. After a successful deployment, open [the demo](https://kageryo.github.io/host-monitor/).
+
+The URL becomes available after Pages is enabled and the first deployment succeeds. See [GitHub's custom workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for setup details. Real ICMP checks and the Node.js API still require a self-hosted server.
 
 ## Development
 
@@ -118,11 +135,20 @@ The backend uses Express 5 and the `ping` package. The dashboard uses vanilla Ja
 
 ```bash
 npm install
+npm test
 node --check server.js
 npm start
 ```
 
-There is no automated test suite configured yet. After changing the application, check host creation, editing, deletion, manual checks, filters, theme switching, and persistence across a restart.
+`npm test` runs the demo transport tests using Node.js's built-in test runner. They cover synthetic status totals, host management, IPv4 validation, persistence, history limits, category ordering, reset, malformed requests, and unavailable storage. Browser verification requires Node.js 20 or newer. The browser check covers rendering under the Pages subpath, host management, filtering, themes, persistence, manual and automatic checks, category ordering, reset, mobile layout, disabled storage, and the normal API transport:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:browser
+```
+
+To use an existing Chrome installation, set `CHROME_PATH` to its executable path instead of installing Chromium. Real ping behavior requires a reachable self-hosted target.
 
 ## License
 
