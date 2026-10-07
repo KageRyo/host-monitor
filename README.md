@@ -1,6 +1,6 @@
 # Host Monitor
 
-[正體中文](README_TW.md)
+[正體中文](README_TW.md) · [Demo](https://kageryo.github.io/host-monitor/)
 
 A lightweight, self-hosted dashboard for checking whether servers, NAS devices, printers, and other IPv4 hosts are reachable. Host Monitor runs ICMP ping checks from your server and displays status, response time, uptime, and recent check history in a browser.
 
@@ -10,6 +10,10 @@ A lightweight, self-hosted dashboard for checking whether servers, NAS devices, 
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#data-and-logs)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
+
+[![Host Monitor demo dashboard showing grouped synthetic hosts, uptime, response times, and heartbeat history](docs/images/demo-dashboard.png)](https://kageryo.github.io/host-monitor/)
+
+Demo dashboard with synthetic hosts in the dark theme.
 
 ## At a glance
 

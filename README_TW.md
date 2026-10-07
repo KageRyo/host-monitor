@@ -1,6 +1,6 @@
 # Host Monitor 主機監測系統
 
-[English](README.md)
+[English](README.md) · [Demo](https://kageryo.github.io/host-monitor/)
 
 輕量、適合自架的 IPv4 主機監測儀表板，可用於伺服器、NAS、印表機與其他設備。後端從部署主機執行 ICMP ping，網頁顯示在線狀態、回應時間、可用率與最近檢查紀錄。
 
@@ -10,6 +10,10 @@
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#資料與日誌)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
+
+[![Host Monitor demo 儀表板：分類主機、可用率、回應時間與心跳歷史](docs/images/demo-dashboard.png)](https://kageryo.github.io/host-monitor/)
+
+Demo 儀表板（深色主題），畫面主機與檢查結果皆為模擬資料。
 
 ## 功能概覽
 

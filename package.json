@@ -1,6 +1,6 @@
 {
-  "name": "server-monitor",
-  "version": "1.0.0",
+  "name": "host-monitor",
+  "version": "0.1.0",
   "description": "A lightweight, self-hosted server/NAS/device uptime monitoring tool with a clean UI. Similar to Uptime Kuma but simpler.",
   "main": "server.js",
   "scripts": {
