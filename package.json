@@ -18,7 +18,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/KageRyo/server-monitor.git"
+    "url": "https://github.com/KageRyo/host-monitor.git"
   },
   "dependencies": {
     "express": "^5.2.1",
