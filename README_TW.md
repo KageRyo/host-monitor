@@ -1,6 +1,6 @@
 # Host Monitor 主機監測系統
 
-[English](README.md)
+[English](README.md) · [Demo](https://kageryo.github.io/host-monitor/)
 
 輕量、適合自架的 IPv4 主機監測儀表板，可用於伺服器、NAS、印表機與其他設備。後端從部署主機執行 ICMP ping，網頁顯示在線狀態、回應時間、可用率與最近檢查紀錄。
 
@@ -10,6 +10,8 @@
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#資料與日誌)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
+
+[![Host Monitor demo 儀表板：分類主機、可用率、回應時間與心跳歷史](docs/images/demo-dashboard.png)](https://kageryo.github.io/host-monitor/)
 
 ## 功能概覽
 
@@ -134,15 +136,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` 使用 Node.js 內建測試工具，驗證模擬狀態統計、主機管理、IPv4 驗證、資料保存、歷史上限、類別排序、重設、錯誤請求與停用儲存情境。瀏覽器測試需要 Node.js 20 以上，涵蓋 Pages 子路徑、主機管理、篩選、主題、資料保存、手動與自動檢查、類別排序、重設、手機版面、停用儲存及一般 API 模式：
-
-```bash
-npm ci --ignore-scripts
-npm run browser:install
-npm run test:browser
-```
-
-若使用現有 Chrome，可設定 `CHROME_PATH` 為執行檔位置，省略安裝 Chromium。真正的 ping 行為需以自架服務與可達目標驗證。
+`npm test` 使用 Node.js 內建測試工具驗證 demo 資料操作；CI 也會執行儀表板的瀏覽器測試。
 
 ## License
 

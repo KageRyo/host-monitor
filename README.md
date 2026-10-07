@@ -1,6 +1,6 @@
 # Host Monitor
 
-[正體中文](README_TW.md)
+[正體中文](README_TW.md) · [Demo](https://kageryo.github.io/host-monitor/)
 
 A lightweight, self-hosted dashboard for checking whether servers, NAS devices, printers, and other IPv4 hosts are reachable. Host Monitor runs ICMP ping checks from your server and displays status, response time, uptime, and recent check history in a browser.
 
@@ -10,6 +10,8 @@ A lightweight, self-hosted dashboard for checking whether servers, NAS devices, 
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#data-and-logs)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
+
+[![Host Monitor demo dashboard showing grouped synthetic hosts, uptime, response times, and heartbeat history](docs/images/demo-dashboard.png)](https://kageryo.github.io/host-monitor/)
 
 ## At a glance
 
@@ -140,15 +142,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` runs the demo transport tests using Node.js's built-in test runner. They cover synthetic status totals, host management, IPv4 validation, persistence, history limits, category ordering, reset, malformed requests, and unavailable storage. Browser verification requires Node.js 20 or newer. The browser check covers rendering under the Pages subpath, host management, filtering, themes, persistence, manual and automatic checks, category ordering, reset, mobile layout, disabled storage, and the normal API transport:
-
-```bash
-npm ci --ignore-scripts
-npm run browser:install
-npm run test:browser
-```
-
-To use an existing Chrome installation, set `CHROME_PATH` to its executable path instead of installing Chromium. Real ping behavior requires a reachable self-hosted target.
+`npm test` checks the demo transport using Node.js’s built-in test runner. Dashboard browser checks also run in CI.
 
 ## License
 
