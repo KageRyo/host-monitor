@@ -4,7 +4,11 @@
   "description": "A lightweight, self-hosted server/NAS/device uptime monitoring tool with a clean UI. Similar to Uptime Kuma but simpler.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test",
+    "build:demo": "node scripts/build-demo.js",
+    "test:browser": "npm run build:demo && node scripts/verify-demo-browser.cjs",
+    "browser:install": "playwright install chromium"
   },
   "keywords": [
     "uptime",
@@ -23,5 +27,8 @@
   "dependencies": {
     "express": "^5.2.1",
     "ping": "^0.4.4"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
   }
 }

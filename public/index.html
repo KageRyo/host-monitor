@@ -113,7 +113,7 @@
             <i class="fa-solid fa-server text-lg"></i>
           </div>
           <div>
-            <div class="font-semibold text-2xl tracking-tight text-slate-800 dark:text-white">主機監測系統</div>
+            <div class="font-semibold text-base sm:text-2xl tracking-tight text-slate-800 dark:text-white whitespace-nowrap"><span class="sm:hidden">Host Monitor</span><span class="hidden sm:inline">主機監測系統</span></div>
             <div class="text-[10px] text-slate-400 -mt-1 font-medium">INTERNAL MONITOR</div>
           </div>
         </div>
@@ -123,7 +123,7 @@
           <!-- Theme Toggle -->
           <button onclick="toggleTheme()" 
                   class="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors"
-                  title="切換明暗主題">
+                  title="切換明暗主題" aria-label="切換明暗主題">
             <i class="fa-solid fa-sun text-lg dark:hidden"></i>
             <i class="fa-solid fa-moon text-lg hidden dark:block"></i>
           </button>
@@ -131,29 +131,43 @@
           <!-- Reorder Groups -->
           <button onclick="toggleReorderMode()" 
                   id="reorder-btn"
-                  class="flex items-center gap-x-1.5 px-3 py-1.5 text-sm font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors"
-                  title="調整類別順序">
+                  class="flex items-center gap-x-1.5 px-2 sm:px-3 py-1.5 text-sm font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors"
+                  title="調整類別順序" aria-label="調整類別順序">
             <i class="fa-solid fa-sort"></i>
             <span class="hidden sm:inline">排序</span>
           </button>
 
           <!-- Check All -->
-          <button onclick="checkAllNow()"
-                  class="flex items-center gap-x-2 px-4 py-2 text-sm font-medium bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-2xl transition-colors">
+          <button onclick="checkAllNow()" aria-label="立即檢查" title="立即檢查"
+                  class="flex items-center gap-x-2 px-2 sm:px-4 py-2 text-sm font-medium bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-2xl transition-colors">
             <i class="fa-solid fa-sync-alt"></i>
             <span class="hidden sm:inline">立即檢查</span>
           </button>
 
           <!-- Add Button -->
-          <button onclick="showAddModal()"
-                  class="flex items-center gap-x-2 px-4 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl shadow-sm transition-all">
+          <button onclick="showAddModal()" aria-label="新增主機" title="新增主機"
+                  class="flex items-center gap-x-2 px-2 sm:px-4 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl shadow-sm transition-all">
             <i class="fa-solid fa-plus"></i>
-            <span>新增主機</span>
+            <span class="hidden sm:inline">新增主機</span>
           </button>
         </div>
       </div>
     </div>
   </nav>
+
+  <aside id="demo-banner" hidden aria-label="Demo information" class="bg-emerald-50 dark:bg-emerald-950 border-b border-emerald-200 dark:border-emerald-900">
+    <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <strong class="text-emerald-800 dark:text-emerald-300">Interactive demo · 模擬展示</strong>
+        <p class="text-sm text-slate-600 dark:text-slate-300 mt-1">所有主機與檢查結果皆為模擬資料，不會連線到輸入的 IP。變更僅儲存在此瀏覽器；停用儲存時重新整理會重設。</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Simulated hosts and checks. Edits stay in this browser. Self-host for real monitoring.</p>
+      </div>
+      <div class="flex gap-3 items-center text-sm">
+        <a href="https://github.com/KageRyo/host-monitor" target="_blank" rel="noopener noreferrer" class="text-emerald-700 dark:text-emerald-300 underline">GitHub / 自架指南</a>
+        <button id="demo-reset" type="button" onclick="resetDemo()" class="px-3 py-2 rounded-xl border border-emerald-400 text-emerald-800 dark:text-emerald-200">重設 Demo</button>
+      </div>
+    </div>
+  </aside>
 
   <div class="max-w-screen-2xl mx-auto px-6 pt-6 pb-10">
 
@@ -317,9 +331,16 @@
     <span id="toast-text"></span>
   </div>
 
+  <!-- DEMO_CONFIG -->
+  <script src="./demo.js"></script>
   <script>
     // ==================== 設定 ====================
     const API_BASE = '/api';
+    const isDemo = window.HOST_MONITOR_DEMO === true || new URLSearchParams(location.search).get('demo') === '1';
+    let demoStorage;
+    try { demoStorage = window.localStorage; } catch { /* Use in-memory demo state. */ }
+    const demoApi = isDemo ? createDemoApi(demoStorage) : null;
+    const apiRequest = demoApi ? demoApi.request : window.fetch.bind(window);
     let currentMonitors = [];
     let currentModalId = null;
     let currentViewingMonitor = null;   // 用來記錄目前打開的詳細視窗是哪一台
@@ -328,8 +349,12 @@
     let isReorderMode = false;
 
     // ==================== 主題切換（亮色 / 暗色） ====================
+    function getSavedTheme() {
+      try { return localStorage.getItem('theme'); } catch { return null; }
+    }
+
     function initTheme() {
-      const saved = localStorage.getItem('theme');
+      const saved = getSavedTheme();
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
       let shouldBeDark;
@@ -352,7 +377,7 @@
       // 如果使用者沒有手動選擇過，則跟隨系統變化
       if (!saved) {
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-          if (!localStorage.getItem('theme')) {
+          if (!getSavedTheme()) {
             document.documentElement.classList.toggle('dark', e.matches);
           }
         });
@@ -364,10 +389,26 @@
       const isNowDark = html.classList.toggle('dark');
 
       // 明確儲存使用者選擇
-      localStorage.setItem('theme', isNowDark ? 'dark' : 'light');
+      try { localStorage.setItem('theme', isNowDark ? 'dark' : 'light'); } catch { /* Session-only theme. */ }
+    }
+
+    async function resetDemo() {
+      if (!demoApi || !confirm('重設模擬主機與所有 Demo 變更？')) return;
+      demoApi.reset();
+      hideDetailModal();
+      hideFormModal();
+      currentFilter = 'all';
+      await refreshUI();
+      showToast('Demo 已重設');
     }
 
     // ==================== 工具函式 ====================
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[char]));
+    }
+
     function formatTimeAgo(iso) {
       if (!iso) return '未檢查';
       const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -476,7 +517,7 @@
           if (key) order.push(key);
         });
 
-        await fetch('/api/groups/order', {
+        await apiRequest('/api/groups/order', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ order })
@@ -541,8 +582,8 @@
       card.innerHTML = `
         <div class="flex items-start justify-between">
           <div class="min-w-0">
-            <div class="font-semibold text-lg leading-tight text-slate-800 dark:text-white truncate">${monitor.name}</div>
-            <div class="ip-text text-emerald-600 dark:text-emerald-400 mt-0.5">${monitor.ip}</div>
+            <div class="font-semibold text-lg leading-tight text-slate-800 dark:text-white truncate">${escapeHtml(monitor.name)}</div>
+            <div class="ip-text text-emerald-600 dark:text-emerald-400 mt-0.5">${escapeHtml(monitor.ip)}</div>
           </div>
           <div class="flex items-center gap-x-2">
             <span class="status-dot ${isUp ? 'status-up' : isDown ? 'status-down' : 'status-unknown'}"></span>
@@ -566,8 +607,8 @@
         </div>
 
         ${monitor.notes ? `
-        <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 italic truncate" title="${monitor.notes}">
-          📍 ${monitor.notes}
+        <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 italic truncate" title="${escapeHtml(monitor.notes)}">
+          📍 ${escapeHtml(monitor.notes)}
         </div>` : ''}
 
         <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
@@ -640,16 +681,16 @@
 
         let headerHTML = `
           <div class="flex items-center gap-x-2 mb-3 px-1">
-            <span class="section-title">${label}</span>
+            <span class="section-title">${escapeHtml(label)}</span>
             <span class="text-xs text-slate-400">(${items.length})</span>
         `;
 
         if (isReorderMode) {
           headerHTML += `
-            <button onclick="moveGroupByInternal('${internal}', -1)" class="ml-2 text-slate-400 hover:text-emerald-600 px-1" title="上移">
+            <button data-move="-1" class="ml-2 text-slate-400 hover:text-emerald-600 px-1" title="上移">
               <i class="fa-solid fa-arrow-up"></i>
             </button>
-            <button onclick="moveGroupByInternal('${internal}', 1)" class="text-slate-400 hover:text-emerald-600 px-1" title="下移">
+            <button data-move="1" class="text-slate-400 hover:text-emerald-600 px-1" title="下移">
               <i class="fa-solid fa-arrow-down"></i>
             </button>
           `;
@@ -659,10 +700,13 @@
 
         section.innerHTML = `
           ${headerHTML}
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4" id="grid-${internal}"></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4" data-monitor-grid></div>
         `;
 
-        const grid = section.querySelector(`#grid-${internal}`);
+        section.querySelectorAll('[data-move]').forEach(button => {
+          button.addEventListener('click', () => moveGroupByInternal(internal, Number(button.dataset.move)));
+        });
+        const grid = section.querySelector('[data-monitor-grid]');
         items.forEach(m => grid.appendChild(createMonitorCard(m)));
         container.appendChild(section);
       });
@@ -673,7 +717,7 @@
     // ==================== 重新整理 ====================
     async function refreshUI(silent = false) {
       try {
-        const res = await fetch(`${API_BASE}/monitors`);
+        const res = await apiRequest(`${API_BASE}/monitors`);
         const data = await res.json();
         currentMonitors = data.monitors || [];
         window.lastStats = data.stats || {};
@@ -751,14 +795,15 @@
     async function checkSingleFromModal() {
       if (!currentModalId) return;
       try {
-        const res = await fetch(`${API_BASE}/monitors/${currentModalId}/check`, { method: 'POST' });
+        const checkedId = currentModalId;
+        const res = await apiRequest(`${API_BASE}/monitors/${checkedId}/check`, { method: 'POST' });
         const updated = await res.json();
         showToast('檢查完成');
         const idx = currentMonitors.findIndex(m => m.id === currentModalId);
         if (idx > -1) currentMonitors[idx] = updated;
         hideDetailModal();
         await refreshUI(true);
-        const fresh = currentMonitors.find(m => m.id === currentModalId);
+        const fresh = currentMonitors.find(m => m.id === checkedId);
         if (fresh) showDetailModal(fresh);
       } catch {
         showToast('檢查失敗', true);
@@ -767,7 +812,7 @@
 
     async function deleteFromModal() {
       if (!currentModalId || !confirm('確定要刪除此監測項目嗎？')) return;
-      await fetch(`${API_BASE}/monitors/${currentModalId}`, { method: 'DELETE' });
+      await apiRequest(`${API_BASE}/monitors/${currentModalId}`, { method: 'DELETE' });
       showToast('已刪除');
       hideDetailModal();
       await refreshUI(true);
@@ -870,7 +915,7 @@
       try {
         const url = editingId ? `${API_BASE}/monitors/${editingId}` : `${API_BASE}/monitors`;
         const method = editingId ? 'PUT' : 'POST';
-        const res = await fetch(url, {
+        const res = await apiRequest(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editingId ? { name: payload.name, group, notes: payload.notes } : payload)
@@ -887,7 +932,7 @@
     // ==================== 全部檢查 ====================
     async function checkAllNow() {
       try {
-        const res = await fetch(`${API_BASE}/check-all`, { method: 'POST' });
+        const res = await apiRequest(`${API_BASE}/check-all`, { method: 'POST' });
         if (res.status === 429) { showToast('檢查中，請稍候', true); return; }
         await res.json();
         showToast('已完成全部檢查');
@@ -905,6 +950,13 @@
 
     async function init() {
       initTheme();
+      if (isDemo) {
+        document.getElementById('demo-banner').hidden = false;
+        setInterval(async () => {
+          await apiRequest(`${API_BASE}/check-all`, { method: 'POST' });
+          await refreshUI(true);
+        }, 30000);
+      }
       await refreshUI(true);
       startAutoRefresh();
 
