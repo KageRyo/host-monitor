@@ -1,107 +1,129 @@
-# 主機監測系統
+# Host Monitor
 
-一個輕量、乾淨、適合自架的伺服器 / NAS / 設備在線監測工具，類似 Uptime Kuma 的簡化版本。
+[正體中文](README_TW.md)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A lightweight, self-hosted dashboard for checking whether servers, NAS devices, printers, and other IPv4 hosts are reachable. Host Monitor runs ICMP ping checks from your server and displays status, response time, uptime, and recent check history in a browser.
 
-## 特色
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#data-and-logs)
+[![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
 
-- **零依賴**：只需要 Node.js 即可運行
-- **即時監測**：每 30 秒自動 ping 檢查所有主機
-- **視覺化**：狀態卡片 + 最近檢查心跳圖
-- **自訂類別**：可自由新增「伺服器、NAS、印表機、邊緣裝置」等分類
-- **備註功能**：每台主機可加入放置位置或維護備註
-- **篩選功能**：可快速只看上線或離線的主機
-- **資料本地化**：所有資料僅儲存在 `data/monitors.json`，隱私安全
-- **適合開源**：預設不帶任何主機清單，方便直接 fork 使用
+## At a glance
 
-## 快速開始
+| Feature | Behavior |
+| --- | --- |
+| Reachability checks | ICMP ping every 30 seconds by default, with manual checks for one or all hosts |
+| Dashboard | Grouped status cards, response times, uptime percentages, and heartbeat history |
+| Host management | Add, edit, and remove IPv4 targets with names, categories, and notes |
+| Organization | Custom category order and online/offline filters |
+| Appearance | Light and dark themes; the current interface uses Traditional Chinese |
+| Storage | Local JSON file; no database service required |
 
-### 1. 安裝
+Uptime is the percentage of successful recorded checks. Each host retains its latest 60 history entries, while its cumulative check counters are stored separately. A successful ping indicates network reachability; it does not verify the health of an HTTP service or application.
+
+## Quick start
+
+You need Node.js 18 or newer, npm, and a working system `ping` command. The Bash helpers also require `setsid` and standard Linux process utilities; use `npm start` for foreground execution on other platforms with a compatible ping utility.
 
 ```bash
-git clone https://github.com/KageRyo/server-monitor.git
-cd server-monitor
+git clone https://github.com/KageRyo/host-monitor.git
+cd host-monitor
 npm install
+npm start
 ```
 
-### 2. 啟動
+Open `http://localhost:3000`. The application starts with an empty monitor list. Use **新增主機** (Add host) to enter an IPv4 address, name, category, and optional notes.
+
+For background execution on Linux:
 
 ```bash
 ./start.sh
-```
-
-啟動後會顯示可存取的網址，例如：
-
-```
-   主機監測系統已啟動
-   本機瀏覽：  http://localhost:3000
-   區域網路：  http://你的IP:3000
-```
-
-第一次開啟網頁會看到引導畫面，點擊右上角「新增主機」即可開始使用。
-
-## 加入監測目標
-
-有兩種方式：
-
-1. **推薦**：直接在網頁右上角點「新增主機」
-2. **批次匯入**：複製 `monitors.example.json` 為 `data/monitors.json`，然後自行編輯
-
-## 常用指令
-
-```bash
-# 啟動服務
-./start.sh
-
-# 停止服務
 ./stop.sh
+```
 
-# 查看即時日誌
+`start.sh` prints the local URL and stores the process ID in `logs/server.pid`. LAN URLs are recorded in `logs/monitor.log`.
+
+## Add targets from a file
+
+You can manage targets in the dashboard, or prepare the data file before starting the server:
+
+```bash
+mkdir -p data
+cp monitors.example.json data/monitors.json
+```
+
+Edit the sample addresses and names to match your devices. Stop the server before editing `data/monitors.json` manually, then restart it to load your changes.
+
+Only IPv4 addresses are accepted by the dashboard API. Hostnames and IPv6 addresses are not currently supported.
+
+## Configuration
+
+Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing process environment variables take precedence over values in `.env`.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP listening port |
+| `CHECK_INTERVAL` | `30000` | Interval between automatic checks, in milliseconds |
+| `LOG_MAX_BYTES` | `5242880` | Log rotation threshold in bytes (5 MiB) |
+| `LOG_MAX_FILES` | `5` | Number of rotated log backups; `0` discards the previous log on rotation |
+| `LOG_TO_STDOUT` | `true` in a terminal, otherwise `false` | Also print application logs to the console |
+
+The example `.env` explicitly sets `LOG_TO_STDOUT=false`. The server loads `.env` directly without an additional dotenv dependency.
+
+## Data and logs
+
+- `data/monitors.json` stores targets, notes, category order, cumulative check counters, and recent history.
+- `logs/monitor.log` stores application logs, with rotated backups named `monitor.log.1` through `monitor.log.5` by default.
+- `logs/startup.log` captures startup output when using `start.sh`.
+
+Both `data/` and `logs/`, along with local environment files, are ignored by Git. Back up `data/monitors.json` if you need to preserve your configuration and counters. With the default check interval, 60 history entries cover approximately 30 minutes.
+
+To follow application logs:
+
+```bash
 tail -f logs/monitor.log
 ```
 
-## 推薦長期執行方式
+## Deployment
 
-建議使用 [PM2](https://pm2.keymetrics.io/) 進行程序管理：
+Run Host Monitor on a machine that can reach the devices you want to check. The HTTP server listens on `0.0.0.0`, so it is accessible through the host's network interfaces when the firewall permits it.
+
+The current application has no built-in authentication. Use it on a trusted network, or place it behind an authenticated reverse proxy when remote access is needed.
+
+For a process manager, run `server.js` directly. For example, with [PM2](https://pm2.keymetrics.io/):
 
 ```bash
 npm install -g pm2
-pm2 start server.js --name "host-monitor"
+pm2 start server.js --name host-monitor
 pm2 save
 pm2 startup
 ```
 
-## 資料儲存說明
+Follow the command printed by `pm2 startup` to configure startup on your system.
 
-- 所有監測目標、備註、檢查歷史都儲存在：`data/monitors.json`
-- 執行日誌位於：`logs/monitor.log`
-- 日誌會自動輪替，預設單檔最大 5MB，保留 5 份備份：`monitor.log.1` ~ `monitor.log.5`
+## GitHub Pages demo feasibility
 
-**重要**：`data/` 與 `logs/` 資料夾已被 `.gitignore` 忽略，不會上傳到 GitHub，保護你的主機 IP 與備註資訊。
+A public interactive demo can run on [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages), which hosts static HTML, CSS, and JavaScript. The Node.js API and system ping checks still require a self-hosted server.
 
-每台主機最多保留最近 60 筆檢查歷史（約 30 分鐘），超過會自動刪除最舊的紀錄，避免檔案無限成長。
+The recommended demo would reuse the dashboard with synthetic hosts and simulated checks, clearly label the data as simulated, and keep demo edits in the visitor's browser. It could demonstrate status cards, heartbeat history, filtering, themes, host management, and category ordering without a backend.
 
-## 環境變數（可選）
+A Pages demo and deployment workflow are not included yet. Publishing the existing `public/` directory alone would leave its `/api/...` requests without a backend.
 
-可建立 `.env` 檔案自訂設定：
+## Development
 
-```env
-PORT=3000
-CHECK_INTERVAL=30000
-LOG_MAX_BYTES=5242880
-LOG_MAX_FILES=5
-LOG_TO_STDOUT=false
+The backend uses Express 5 and the `ping` package. The dashboard uses vanilla JavaScript, Tailwind CSS, and Font Awesome. Frontend styling, icons, and fonts currently load from external CDNs.
+
+```bash
+npm install
+node --check server.js
+npm start
 ```
 
-完整範例請參考 `.env.example`。
-
-## 技術堆疊
-
-- Node.js + Express
-- 純前端（Tailwind CSS + Vanilla JS）
-- 資料儲存：本地 JSON 檔案
+There is no automated test suite configured yet. After changing the application, check host creation, editing, deletion, manual checks, filters, theme switching, and persistence across a restart.
 
 ## License
 
-本專案採用 [MIT License](LICENSE)。
+[MIT](LICENSE) © 2026 Chien-Hsun Chang.
