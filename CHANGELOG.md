@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+## 0.2.0 — 2026-10-08
+
+- Omit framework disclosure headers and resolve backend SonarCloud review findings.
 - Add isolated integration tests for the real Express backend, probe scheduling, persistence errors, configuration, Linux helpers, and generic webhooks.
 - Fix reserved category keys, built-in/legacy category normalization, ordering deduplication, and malformed/non-object JSON validation.
 - Validate HTTP port and check interval; preserve 0ms RTT when reloading saved results.
+- **API compatibility:** `stats.avgUptime` is now `null` when no monitors have recorded checks; consumers must handle this value.
 - Show unknown uptime as `—`, exclude unchecked hosts from averages, and return `stats.avgUptime: null` when no checks exist.
 - Handle non-2xx, proxy, and network errors consistently in dashboard actions without success toasts or lost forms.
 - Bound shared probe concurrency (default 5), prevent duplicate probes, cap new monitors (default 100), and rate-limit manual requests (default 10/minute) with 409/429 responses.
