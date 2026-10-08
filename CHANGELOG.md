@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add isolated integration tests for the real Express backend, history/reload behavior, and persistence errors.
+- Fix reserved category keys, built-in/legacy category normalization, ordering deduplication, and malformed/non-object JSON validation.
 
 
 ## 0.1.0
