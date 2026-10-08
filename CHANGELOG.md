@@ -2,15 +2,15 @@
 
 ## Unreleased
 
-- Add isolated integration tests for the real Express backend, history/reload behavior, and persistence errors.
+- Add isolated integration tests for the real Express backend, probe scheduling, persistence errors, configuration, Linux helpers, and generic webhooks.
 - Fix reserved category keys, built-in/legacy category normalization, ordering deduplication, and malformed/non-object JSON validation.
 - Validate HTTP port and check interval; preserve 0ms RTT when reloading saved results.
 - Show unknown uptime as `—`, exclude unchecked hosts from averages, and return `stats.avgUptime: null` when no checks exist.
 - Handle non-2xx, proxy, and network errors consistently in dashboard actions without success toasts or lost forms.
 - Bound shared probe concurrency (default 5), prevent duplicate probes, cap new monitors (default 100), and rate-limit manual requests (default 10/minute) with 409/429 responses.
 - Verify Linux process identity before TERM/KILL; remove broad process-name termination and clean stale PID records safely.
+- Add opt-in generic JSON webhook notifications on persisted up/down transitions, with timeout, bounded delivery, and safe logs.
 - Expand browser verification to cover real backend/data flows and error responses; document configuration and compatibility in both READMEs.
-
 
 ## 0.1.0
 

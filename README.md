@@ -79,6 +79,9 @@ Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing 
 | `PROBE_CONCURRENCY` | `5` | Shared automatic/manual ping concurrency limit |
 | `MAX_MONITORS` | `100` | Limit on new monitors; existing excess data remains monitored |
 | `MANUAL_CHECK_LIMIT` | `10` | Process-wide manual requests per 60 seconds, shared by both check endpoints |
+| `WEBHOOK_ENABLED` | `false` | Enable generic JSON webhook notifications |
+| `WEBHOOK_URL` | Empty | HTTP/HTTPS receiver URL |
+| `WEBHOOK_TIMEOUT_MS` | `5000` | Notification timeout, 1–2147483647 milliseconds |
 
 Invalid integer settings fall back to defaults with a warning. Concurrency, monitor cap, and manual quota must be positive integers.
 
@@ -88,7 +91,17 @@ The example `.env` explicitly sets `LOG_TO_STDOUT=false`. The server loads `.env
 
 Automatic and manual checks share one queue; probes for the same monitor never overlap. All-host checks share any existing single-host work. Duplicate single/all checks return `429`. Manual requests use a process-wide fixed 60-second window, including rejected duplicate requests; exhausted quotas return `429` with `Retry-After`. Automatic checks do not consume the manual quota. Adding beyond the monitor cap returns `409`; editing and deleting remain available.
 
-Creating/updating monitors and saving group order require a JSON object. Missing, malformed, or non-object bodies return `400 { error }`. `stats.avgUptime` is a number or `null`; `null` means no recorded checks, while 0 means 0%. Built-in category labels normalize to `server`, `nas`, `printer`, and `edge`. Legacy data normalizes on load and is written back on the next successful save.
+Creating/updating monitors and saving group order require a JSON object. Missing, malformed, or non-object bodies return `400 { error }`. `stats.avgUptime` is a number or `null`; `null` means no recorded checks, while 0 means 0%. Failed check writes restore status, history, and counters; those checks do not contribute to uptime, and only persisted results trigger notifications. Built-in category labels normalize to `server`, `nas`, `printer`, and `edge`. Legacy data normalizes on load and is written back on the next successful save.
+
+## Webhook notifications
+
+Set `WEBHOOK_ENABLED=true` and `WEBHOOK_URL`, then restart. After successfully persisting a result, the server sends only `up→down` and `down→up` transitions. Initial unknown states, unchanged states, and the demo do not send notifications. An HTTP/HTTPS receiver gets this generic JSON:
+
+```json
+{"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}
+```
+
+Delivery runs in the background with two workers and up to 100 waiting events. Queue overflow drops new events with a warning. Timeouts and HTTP failures do not block monitoring and are not retried; restarts discard waiting events. Invalid URLs disable notifications with a safe warning. URLs, tokens, and response bodies are never logged. This version has no failure threshold, cooldown, or durable redelivery. Discord/Slack require a bridge that accepts generic JSON.
 
 ## Data and logs
 
@@ -157,7 +170,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` uses Node.js’s built-in runner for backend and demo, configuration and Linux helpers, scheduler suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions, real API/data flows, and failure UI.
+`npm test` uses Node.js’s built-in runner for separate backend, demo, configuration, scheduler, Linux helper, and webhook suites. Backend data lives in temporary directories, probes are mocked, and notifications use local HTTP receivers; no real ICMP or external service is needed. CI also runs `npm run test:browser` for demo interactions, real API/data flows, and failure UI.
 
 ## License
 
