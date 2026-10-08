@@ -3,10 +3,12 @@ const ping = require('ping');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const { readConfig } = require('./config');
 const { groupKey, groupLabel } = require('./public/shared');
 
 function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   probe: injectedProbe, logger = console, config = {} } = {}) {
+  config = { ...readConfig({}, logger), ...config };
   const checkerTimers = [];
   const probe = injectedProbe || realProbe;
   const app = express();
