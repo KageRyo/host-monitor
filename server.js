@@ -3,53 +3,8 @@ const path = require('path');
 const os = require('os');
 const util = require('util');
 
-function loadEnvFile() {
-  const envFile = path.join(__dirname, '.env');
-  if (!fs.existsSync(envFile)) return;
-
-  try {
-    const lines = fs.readFileSync(envFile, 'utf8').split(/\r?\n/);
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) return;
-
-      const equalsIndex = trimmed.indexOf('=');
-      if (equalsIndex === -1) return;
-
-      const key = trimmed.slice(0, equalsIndex).trim();
-      let value = trimmed.slice(equalsIndex + 1).trim();
-      if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) return;
-
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-
-      process.env[key] = value;
-    });
-  } catch (e) {
-    console.error('Failed to load .env file:', e.message);
-  }
-}
-
+const { loadEnvFile, readIntegerEnv, readBooleanEnv, readConfig } = require('./config');
 loadEnvFile();
-
-function readIntegerEnv(name, defaultValue, minValue) {
-  const raw = process.env[name];
-  if (!raw || !/^\d+$/.test(raw.trim())) return defaultValue;
-
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < minValue) return defaultValue;
-  return value;
-}
-
-function readBooleanEnv(name, defaultValue) {
-  const value = process.env[name];
-  if (value === undefined) return defaultValue;
-  return !['0', 'false', 'no', 'off'].includes(value.trim().toLowerCase());
-}
 
 const LOG_FILE = path.join(__dirname, 'logs', 'monitor.log');
 const LOG_MAX_BYTES = readIntegerEnv('LOG_MAX_BYTES', 5 * 1024 * 1024, 1);
@@ -161,9 +116,10 @@ function getLocalIPs() {
 
 // Boot
 const { createApp } = require('./app');
-const PORT = Number.parseInt(process.env.PORT || '3000', 10);
-const CHECK_INTERVAL = Number.parseInt(process.env.CHECK_INTERVAL || '30000', 10);
-const backend = createApp({ config: { checkInterval: CHECK_INTERVAL } });
+const config = readConfig();
+const PORT = config.port;
+const CHECK_INTERVAL = config.checkInterval;
+const backend = createApp({ config });
 backend.startChecker();
 
 backend.app.listen(PORT, '0.0.0.0', () => {

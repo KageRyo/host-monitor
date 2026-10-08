@@ -46,7 +46,9 @@ Linux 背景執行：
 ./stop.sh
 ```
 
-`start.sh` 顯示本機網址，PID 儲存於 `logs/server.pid`；區域網路網址記錄於 `logs/monitor.log`。
+`start.sh` 顯示本機網址，PID 與程序啟動時間分別儲存於 `logs/server.pid`、`logs/server.identity`；區域網路網址記錄於 `logs/monitor.log`。
+
+腳本送出訊號前會核對程序啟動時間、cwd 與 Node 入口；失效或身分不符的記錄只會清理，不會依名稱搜尋並終止程序。升級舊版前請先透過原本的程序管理方式停止服務；新腳本不會終止缺少身分記錄的舊程序。
 
 ## 從檔案匯入目標
 
@@ -65,11 +67,13 @@ cp monitors.example.json data/monitors.json
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
-| `PORT` | `3000` | HTTP 監聽連接埠 |
-| `CHECK_INTERVAL` | `30000` | 自動檢查間隔，單位為毫秒 |
+| `PORT` | `3000` | HTTP 監聽連接埠，範圍 1–65535 |
+| `CHECK_INTERVAL` | `30000` | 自動檢查間隔，1000–2147483647 毫秒 |
 | `LOG_MAX_BYTES` | `5242880` | 日誌輪替門檻，單位為 bytes（5 MiB） |
 | `LOG_MAX_FILES` | `5` | 保留的備份數；設為 `0` 時輪替會丟棄舊日誌 |
 | `LOG_TO_STDOUT` | 終端機中為 `true`，其餘為 `false` | 是否同時輸出到主控台 |
+
+整數設定無效時使用預設值並記錄警告。
 
 範例 `.env` 明確設定 `LOG_TO_STDOUT=false`。後端直接載入 `.env`，無需額外的 dotenv 套件。
 
@@ -140,7 +144,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo 操作。
+`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo、設定及 Linux 腳本。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo 操作。
 
 ## License
 

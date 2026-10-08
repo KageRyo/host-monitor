@@ -46,7 +46,9 @@ For background execution on Linux:
 ./stop.sh
 ```
 
-`start.sh` prints the local URL and stores the process ID in `logs/server.pid`. LAN URLs are recorded in `logs/monitor.log`.
+`start.sh` prints the local URL and stores the process ID in `logs/server.pid` and process start time in `logs/server.identity`. LAN URLs are recorded in `logs/monitor.log`.
+
+Before signaling, the helpers verify process start time, cwd, and the Node entrypoint. Stale or mismatched records are cleaned without signaling unrelated processes. Before upgrading, stop the old service through its existing process manager; the new helpers refuse to kill legacy processes without an identity record.
 
 ## Add targets from a file
 
@@ -67,11 +69,13 @@ Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing 
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PORT` | `3000` | HTTP listening port |
-| `CHECK_INTERVAL` | `30000` | Interval between automatic checks, in milliseconds |
+| `PORT` | `3000` | HTTP listening port, 1–65535 |
+| `CHECK_INTERVAL` | `30000` | Automatic check interval, 1000–2147483647 milliseconds |
 | `LOG_MAX_BYTES` | `5242880` | Log rotation threshold in bytes (5 MiB) |
 | `LOG_MAX_FILES` | `5` | Number of rotated log backups; `0` discards the previous log on rotation |
 | `LOG_TO_STDOUT` | `true` in a terminal, otherwise `false` | Also print application logs to the console |
+
+Invalid integer settings fall back to defaults with a warning.
 
 The example `.env` explicitly sets `LOG_TO_STDOUT=false`. The server loads `.env` directly without an additional dotenv dependency.
 
@@ -146,7 +150,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` uses Node.js’s built-in runner for backend and demo suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions.
+`npm test` uses Node.js’s built-in runner for backend and demo, configuration and Linux helpers suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions.
 
 ## License
 
