@@ -243,3 +243,9 @@ test('real check history keeps 60 entries while cumulative counters survive relo
   assert.equal(monitor.history.length, 60);
   assert.equal(monitor.responseTime, 0);
 });
+
+test('API responses omit framework disclosure headers', async t => {
+  const { request } = await setup(t);
+  const response = await request('/api/monitors');
+  assert.equal(response.headers.get('x-powered-by'), null);
+});
