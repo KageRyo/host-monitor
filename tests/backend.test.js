@@ -108,6 +108,126 @@ test('uptime excludes unchecked hosts and distinguishes zero from unknown', asyn
   assert.equal((await request('/api/monitors')).body.stats.avgUptime, 0);
 });
 
+async function waitFor(predicate) {
+  const deadline = Date.now() + 3000;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('Timed out waiting for test condition');
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
+
+test('all checks have bounded concurrency and rejected probes do not retain locks', async t => {
+  let active = 0, peak = 0;
+  const { request } = await setup(t, { config: { probeConcurrency: 2 }, probe: async ip => {
+    active++; peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    active--;
+    if (ip.endsWith('.1')) throw new Error('Probe failure');
+    return { alive: true, rtt: 5 };
+  } });
+  for (let i = 1; i <= 6; i++) await request('/api/monitors', 'POST', { ip: `192.0.2.${i}` });
+  const result = await request('/api/check-all', 'POST');
+  assert.equal(result.status, 200);
+  assert.equal(peak, 2);
+  assert.ok(result.body.monitors.every(m => m.totalChecks === 1));
+  assert.equal(result.body.monitors.find(m => m.ip === '192.0.2.1').status, 'down');
+  assert.equal((await request('/api/monitors/192-0-2-1/check', 'POST')).status, 200);
+});
+
+test('single and all checks share in-flight probes and reject duplicate manual work', async t => {
+  let calls = 0;
+  const { request } = await setup(t, { probe: async () => {
+    calls++;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    return { alive: true, rtt: 1 };
+  } });
+  await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  const single = request('/api/monitors/192-0-2-1/check', 'POST');
+  await waitFor(() => calls === 1);
+  const duplicate = request('/api/monitors/192-0-2-1/check', 'POST');
+  const all = request('/api/check-all', 'POST');
+  for (let i = 0; i < 100; i++) {
+    if ((await request('/api/monitors')).body.isChecking) break;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  const overlappingAll = await request('/api/check-all', 'POST');
+  const [singleResult, allResult, duplicateResult] = await Promise.all([single, all, duplicate]);
+  assert.equal(duplicateResult.status, 429);
+  assert.equal(overlappingAll.status, 429);
+  assert.equal(singleResult.status, 200);
+  assert.equal(allResult.status, 200);
+  assert.equal(calls, 1);
+  assert.equal(allResult.body.monitors[0].totalChecks, 1);
+});
+
+test('manual endpoints share a quota with Retry-After and a configurable monitor cap', async t => {
+  const { request } = await setup(t, { config: { manualCheckLimit: 2, maxMonitors: 1 } });
+  await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  assert.equal((await request('/api/monitors', 'POST', { ip: '192.0.2.2' })).status, 409);
+  assert.equal((await request('/api/monitors/192-0-2-1/check', 'POST')).status, 200);
+  assert.equal((await request('/api/check-all', 'POST')).status, 200);
+  const limited = await request('/api/check-all', 'POST');
+  assert.equal(limited.status, 429);
+  assert.ok(Number(limited.headers.get('Retry-After')) > 0);
+  assert.equal((await request('/api/monitors/192-0-2-1', 'PUT', { name: 'Still editable' })).status, 200);
+});
+
+test('deleted queued or active targets are not probed again or resurrected', async t => {
+  let release, calls = [];
+  const gate = new Promise(resolve => { release = () => resolve({ alive: true, rtt: 1 }); });
+  const { request } = await setup(t, { config: { probeConcurrency: 1 }, probe: ip => {
+    calls.push(ip);
+    return gate;
+  } });
+  for (let i = 1; i <= 2; i++) await request('/api/monitors', 'POST', { ip: `192.0.2.${i}` });
+  const all = request('/api/check-all', 'POST');
+  await waitFor(() => calls.length >= 1);
+  await request('/api/monitors/192-0-2-1', 'DELETE');
+  await request('/api/monitors/192-0-2-2', 'DELETE');
+  await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  release();
+  assert.equal((await all).status, 200);
+  assert.deepEqual(calls, ['192.0.2.1']);
+  const snapshot = (await request('/api/monitors')).body;
+  assert.equal(snapshot.monitors.length, 1);
+  assert.equal(snapshot.monitors[0].totalChecks, 0);
+});
+
+test('existing data above the monitor cap remains editable and monitored', async t => {
+  const { request, dataFile } = await setup(t);
+  for (let i = 1; i <= 3; i++) await request('/api/monitors', 'POST', { ip: `192.0.2.${i}` });
+  const restricted = await setup(t, { dataFile, config: { maxMonitors: 2 } });
+  assert.equal((await restricted.request('/api/monitors')).body.monitors.length, 3);
+  assert.equal((await restricted.request('/api/check-all', 'POST')).status, 200);
+  assert.equal((await restricted.request('/api/monitors', 'POST', { ip: '192.0.2.4' })).status, 409);
+  assert.equal((await restricted.request('/api/monitors/192-0-2-1', 'PUT', { name: 'Edited' })).status, 200);
+  await restricted.request('/api/monitors/192-0-2-1', 'DELETE');
+  await restricted.request('/api/monitors/192-0-2-2', 'DELETE');
+  assert.equal((await restricted.request('/api/monitors', 'POST', { ip: '192.0.2.4' })).status, 201);
+});
+
+test('automatic checks skip overlapping rounds and do not consume the manual quota', async t => {
+  let calls = 0, release;
+  const gate = new Promise(resolve => { release = () => resolve({ alive: true, rtt: 1 }); });
+  const backend = await setup(t, { config: { checkInterval: 1000, manualCheckLimit: 1 },
+    probe: () => { calls++; return gate; } });
+  await backend.request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  backend.startChecker();
+  backend.startChecker();
+  await waitFor(() => calls > 0);
+  await new Promise(resolve => setTimeout(resolve, 600)); // Includes the startup check at 1500ms.
+  assert.equal(calls, 1);
+  assert.equal((await backend.request('/api/monitors')).body.isChecking, true);
+  backend.stopChecker();
+  release();
+  for (let i = 0; i < 100; i++) {
+    if (!(await backend.request('/api/monitors')).body.isChecking) break;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  assert.equal((await backend.request('/api/monitors/192-0-2-1/check', 'POST')).status, 200);
+  assert.equal((await backend.request('/api/check-all', 'POST')).status, 429);
+});
+
 test('real check history keeps 60 entries while cumulative counters survive reload with zero RTT', async t => {
   const { request, dataFile } = await setup(t, { config: { manualCheckLimit: 100 }, probe: async () => ({ alive: true, rtt: 0 }) });
   await request('/api/monitors', 'POST', { ip: '192.0.2.1' });

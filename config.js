@@ -38,6 +38,9 @@ function readConfig(env = process.env, logger = console) {
   return {
     port: integer('PORT', 3000, 1, 65535),
     checkInterval: integer('CHECK_INTERVAL', 30000, 1000, 2147483647),
+    probeConcurrency: integer('PROBE_CONCURRENCY', 5, 1),
+    maxMonitors: integer('MAX_MONITORS', 100, 1),
+    manualCheckLimit: integer('MANUAL_CHECK_LIMIT', 10, 1),
   };
 }
 module.exports = { loadEnvFile, readIntegerEnv, readBooleanEnv, readConfig };

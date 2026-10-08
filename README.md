@@ -76,12 +76,17 @@ Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing 
 | `LOG_MAX_BYTES` | `5242880` | Log rotation threshold in bytes (5 MiB) |
 | `LOG_MAX_FILES` | `5` | Number of rotated log backups; `0` discards the previous log on rotation |
 | `LOG_TO_STDOUT` | `true` in a terminal, otherwise `false` | Also print application logs to the console |
+| `PROBE_CONCURRENCY` | `5` | Shared automatic/manual ping concurrency limit |
+| `MAX_MONITORS` | `100` | Limit on new monitors; existing excess data remains monitored |
+| `MANUAL_CHECK_LIMIT` | `10` | Process-wide manual requests per 60 seconds, shared by both check endpoints |
 
-Invalid integer settings fall back to defaults with a warning.
+Invalid integer settings fall back to defaults with a warning. Concurrency, monitor cap, and manual quota must be positive integers.
 
 The example `.env` explicitly sets `LOG_TO_STDOUT=false`. The server loads `.env` directly without an additional dotenv dependency.
 
-## API behavior
+## Check limits and API behavior
+
+Automatic and manual checks share one queue; probes for the same monitor never overlap. All-host checks share any existing single-host work. Duplicate single/all checks return `429`. Manual requests use a process-wide fixed 60-second window, including rejected duplicate requests; exhausted quotas return `429` with `Retry-After`. Automatic checks do not consume the manual quota. Adding beyond the monitor cap returns `409`; editing and deleting remain available.
 
 Creating/updating monitors and saving group order require a JSON object. Missing, malformed, or non-object bodies return `400 { error }`. `stats.avgUptime` is a number or `null`; `null` means no recorded checks, while 0 means 0%. Built-in category labels normalize to `server`, `nas`, `printer`, and `edge`. Legacy data normalizes on load and is written back on the next successful save.
 
@@ -103,7 +108,7 @@ tail -f logs/monitor.log
 
 Run Host Monitor on a machine that can reach the devices you want to check. The HTTP server listens on `0.0.0.0`, so it is accessible through the host's network interfaces when the firewall permits it.
 
-The current application has no built-in authentication. Use it on a trusted network, or place it behind an authenticated reverse proxy when remote access is needed.
+The current application has no built-in authentication. These limits protect one process and do not replace authentication. Use it on a trusted network, or place it behind an authenticated reverse proxy when remote access is needed.
 
 For a process manager, run `server.js` directly. For example, with [PM2](https://pm2.keymetrics.io/):
 
@@ -152,7 +157,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` uses Node.js’s built-in runner for backend and demo, configuration and Linux helpers suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions, real API/data flows, and failure UI.
+`npm test` uses Node.js’s built-in runner for backend and demo, configuration and Linux helpers, scheduler suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions, real API/data flows, and failure UI.
 
 ## License
 

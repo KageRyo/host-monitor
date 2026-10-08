@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { readConfig } = require('./config');
+const { createProbeScheduler, createManualLimiter } = require('./scheduler');
 const { groupKey, groupLabel, averageUptime } = require('./public/shared');
 
 function generateId(ip) {
@@ -169,27 +170,38 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     }
   }
 
-  async function runAllChecks(isManual = false) {
+  const scheduler = createProbeScheduler({ concurrency: config.probeConcurrency, run: async monitor => {
+    if (!monitors.includes(monitor)) return true;
+    let result;
+    try { result = await probe(monitor.ip); }
+    catch { result = { alive: false, rtt: null }; }
+    if (!monitors.includes(monitor)) return true;
+    updateMonitor(monitor, result);
+    const saved = saveToFile();
+    return saved;
+  } });
+  const acquireManualCheck = createManualLimiter({ limit: config.manualCheckLimit });
+  function limitManualCheck(req, res, next) {
+    const retryAfter = acquireManualCheck();
+    if (retryAfter) {
+      res.set('Retry-After', String(retryAfter));
+      return res.status(429).json({ error: '檢查請求過於頻繁，請稍後再試' });
+    }
+    next();
+  }
+
+  async function runAllChecks() {
     if (isChecking) return false;
     isChecking = true;
-
     try {
-      logger.log(`[${new Date().toISOString()}] Running checks for ${monitors.length} monitors...`);
-
-      const tasks = monitors.map(async (m) => {
-        const result = await probe(m.ip);
-        updateMonitor(m, result);
-      });
-
-      await Promise.all(tasks);
-
+      logger.log(`Running checks for ${monitors.length} monitors...`);
+      const results = await Promise.all(monitors.slice().map(m => scheduler.enqueue(m)));
       lastGlobalCheck = new Date().toISOString();
       const saved = saveToFile();
-      if (!saved) {
+      if (!saved || results.some(result => !result)) {
         logger.error('Checks completed but results could not be saved.');
         return false;
       }
-
       logger.log('Checks completed.');
       return true;
     } finally {
@@ -324,6 +336,10 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
       return res.status(409).json({ error: 'Monitor with this IP already exists' });
     }
 
+    if (monitors.length >= config.maxMonitors) {
+      return res.status(409).json({ error: '已達主機數量上限，請刪除項目或調整 MAX_MONITORS' });
+    }
+
     const newMonitor = {
       id,
       ip: cleanIp,
@@ -430,14 +446,15 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   });
 
   // Force check single monitor
-  app.post('/api/monitors/:id/check', async (req, res) => {
+  app.post('/api/monitors/:id/check', limitManualCheck, async (req, res) => {
     const { id } = req.params;
     const monitor = monitors.find(m => m.id === id);
     if (!monitor) return res.status(404).json({ error: 'Not found' });
 
-    const result = await probe(monitor.ip);
-    updateMonitor(monitor, result);
-    if (!saveToFile()) {
+    if (scheduler.has(monitor)) {
+      return res.status(429).json({ error: 'Check already in progress' });
+    }
+    if (!await scheduler.enqueue(monitor)) {
       return res.status(500).json(dataWriteError());
     }
 
@@ -449,7 +466,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   });
 
   // Force check all
-  app.post('/api/check-all', async (req, res) => {
+  app.post('/api/check-all', limitManualCheck, async (req, res) => {
     if (isChecking) {
       return res.status(429).json({ error: 'Check already in progress' });
     }

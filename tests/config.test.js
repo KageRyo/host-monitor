@@ -33,6 +33,16 @@ test('env file is parsed without executing shell and process values take precede
   assert.equal(env.NAME, '$(touch malicious)');
 });
 
+test('probe limits and webhook timeout reject invalid positive integers', () => {
+  const { readConfig } = require('../config');
+  for (const invalid of ['0', '-1', 'abc', '1.5', '999999999999999999']) {
+    const config = readConfig({ PROBE_CONCURRENCY: invalid, MAX_MONITORS: invalid, MANUAL_CHECK_LIMIT: invalid }, { warn() {} });
+    assert.equal(config.probeConcurrency, 5);
+    assert.equal(config.maxMonitors, 100);
+    assert.equal(config.manualCheckLimit, 10);
+  }
+});
+
 test('unreadable env file warns without breaking startup', t => {
   const { loadEnvFile } = require('../config');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'host-monitor-env-error-'));
