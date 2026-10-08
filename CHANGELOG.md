@@ -7,6 +7,7 @@
 - Validate HTTP port and check interval; preserve 0ms RTT when reloading saved results.
 - Show unknown uptime as `—`, exclude unchecked hosts from averages, and return `stats.avgUptime: null` when no checks exist.
 - Handle non-2xx, proxy, and network errors consistently in dashboard actions without success toasts or lost forms.
+- Bound shared probe concurrency (default 5), prevent duplicate probes, cap new monitors (default 100), and rate-limit manual requests (default 10/minute) with 409/429 responses.
 - Verify Linux process identity before TERM/KILL; remove broad process-name termination and clean stale PID records safely.
 - Expand browser verification to cover real backend/data flows and error responses; document configuration and compatibility in both READMEs.
 

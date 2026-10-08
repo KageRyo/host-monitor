@@ -72,12 +72,17 @@ cp monitors.example.json data/monitors.json
 | `LOG_MAX_BYTES` | `5242880` | 日誌輪替門檻，單位為 bytes（5 MiB） |
 | `LOG_MAX_FILES` | `5` | 保留的備份數；設為 `0` 時輪替會丟棄舊日誌 |
 | `LOG_TO_STDOUT` | 終端機中為 `true`，其餘為 `false` | 是否同時輸出到主控台 |
+| `PROBE_CONCURRENCY` | `5` | 自動與手動檢查共用的 ping 並行上限 |
+| `MAX_MONITORS` | `100` | 新增主機上限；既有超量資料仍保留並監測 |
+| `MANUAL_CHECK_LIMIT` | `10` | 每程序每 60 秒允許的手動檢查請求數，兩個端點共用 |
 
-整數設定無效時使用預設值並記錄警告。
+整數設定無效時使用預設值並記錄警告；並行上限、主機上限與手動配額必須是正整數。
 
 範例 `.env` 明確設定 `LOG_TO_STDOUT=false`。後端直接載入 `.env`，無需額外的 dotenv 套件。
 
-## API 行為
+## 檢查限制與 API 行為
+
+自動與手動檢查共用排程，同一主機不會重疊 ping。全量檢查遇到進行中的單台工作時共用結果；重複單台或全量請求回傳 `429`。手動配額為程序全域固定 60 秒視窗，包含被拒絕的重複請求；超限回傳 `429` 與 `Retry-After`。自動檢查不使用手動配額。新增超過主機上限回傳 `409`，編輯及刪除仍可使用。
 
 新增／更新主機與更新排序必須提供 JSON object；缺少、破損或非物件 body 回傳 `400 { error }`。`stats.avgUptime` 為數字或 `null`；`null` 表示沒有可計算的檢查紀錄，0 仍表示 0%。內建分類標籤會轉成 `server`、`nas`、`printer`、`edge`，舊資料在載入時正規化，下次成功儲存時寫回。
 
@@ -95,7 +100,7 @@ tail -f logs/monitor.log
 
 ## 部署
 
-部署主機必須能連到監測目標。HTTP 服務監聽 `0.0.0.0`，防火牆允許時可由主機各網路介面存取。目前沒有內建登入驗證；適合可信任網路；需要遠端存取時，請放在有身分驗證的反向代理後方。
+部署主機必須能連到監測目標。HTTP 服務監聽 `0.0.0.0`，防火牆允許時可由主機各網路介面存取。目前沒有內建登入驗證；上述限制只保護單一程序，不代替身分驗證，適合可信任網路；需要遠端存取時，請放在有身分驗證的反向代理後方。
 
 長期執行可用 [PM2](https://pm2.keymetrics.io/) 直接管理 `server.js`：
 
@@ -144,7 +149,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo、設定及 Linux 腳本。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
+`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo、設定及 Linux 腳本、排程。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
 
 ## License
 
