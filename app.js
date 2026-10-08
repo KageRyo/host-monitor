@@ -13,6 +13,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   const checkerTimers = [];
   const probe = injectedProbe || realProbe;
   const app = express();
+  app.disable('x-powered-by');
   const DATA_FILE = dataFile;
   const CHECK_INTERVAL = config.checkInterval || 30000;
 
@@ -226,7 +227,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
       });
 
       // 剩下的群組（新建立的）按中文排序補在後面
-      const rest = Array.from(remaining).sort((a, b) => 
+      const rest = Array.from(remaining).sort((a, b) =>
         (a || '').localeCompare(b || '', 'zh-Hant')
       );
 
