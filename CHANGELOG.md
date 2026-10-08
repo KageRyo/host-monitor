@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add isolated integration tests for the real Express backend, history/reload behavior, and persistence errors.
+
+
 ## 0.1.0
 
 First tagged release of Host Monitor.

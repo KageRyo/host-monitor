@@ -142,7 +142,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` checks the demo transport using Node.js’s built-in test runner. Dashboard browser checks also run in CI.
+`npm test` uses Node.js’s built-in runner for backend and demo suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions.
 
 ## License
 

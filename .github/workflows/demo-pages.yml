@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -26,7 +25,7 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Install test browser
         run: npm run browser:install -- --with-deps
-      - name: Test demo transport
+      - name: Test backend, demo, configuration and Linux helpers
         run: npm test
       - name: Check backend syntax
         run: node --check server.js

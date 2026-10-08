@@ -87,7 +87,7 @@ tail -f logs/monitor.log
 
 ## 部署
 
-部署主機必須能連到監測目標。HTTP 服務監聽 `0.0.0.0`，防火牆允許時可由主機各網路介面存取。目前沒有內建登入驗證，適合可信任網路；需要遠端存取時，請放在有身分驗證的反向代理後方。
+部署主機必須能連到監測目標。HTTP 服務監聽 `0.0.0.0`，防火牆允許時可由主機各網路介面存取。目前沒有內建登入驗證；適合可信任網路；需要遠端存取時，請放在有身分驗證的反向代理後方。
 
 長期執行可用 [PM2](https://pm2.keymetrics.io/) 直接管理 `server.js`：
 
@@ -136,7 +136,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` 使用 Node.js 內建測試工具驗證 demo 資料操作；CI 也會執行儀表板的瀏覽器測試。
+`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo 操作。
 
 ## License
 
