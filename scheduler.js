@@ -8,7 +8,8 @@ function createProbeScheduler({ concurrency, run }) {
     while (active < concurrency && queue.length) {
       const job = queue.shift();
       active++;
-      Promise.resolve().then(() => run(job.monitor)).then(job.resolve, job.reject).finally(() => {
+      // The enqueue promise owns the result; this chain only releases the worker.
+      void Promise.resolve().then(() => run(job.monitor)).then(job.resolve, job.reject).finally(() => {
         active--;
         jobs.delete(job.monitor);
         drain();
