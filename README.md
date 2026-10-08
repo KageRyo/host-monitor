@@ -75,6 +75,10 @@ Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing 
 
 The example `.env` explicitly sets `LOG_TO_STDOUT=false`. The server loads `.env` directly without an additional dotenv dependency.
 
+## API behavior
+
+Creating/updating monitors and saving group order require a JSON object. Missing, malformed, or non-object bodies return `400 { error }`. Built-in category labels normalize to `server`, `nas`, `printer`, and `edge`. Legacy data normalizes on load and is written back on the next successful save.
+
 ## Data and logs
 
 - `data/monitors.json` stores targets, notes, category order, cumulative check counters, and recent history.

@@ -2,9 +2,8 @@
 (function (root) {
   'use strict';
   const STORAGE_KEY = 'host-monitor-demo:v1';
-  const labels = new Map([['server', '伺服器'], ['nas', 'NAS'], ['printer', '印表機'], ['edge', '邊緣裝置']]);
-  const groupLabel = group => labels.get(group) || group;
-  const groupKey = group => [...labels].find(([, label]) => label === group)?.[0] || group;
+  const { groupKey, groupLabel } = typeof module !== 'undefined' && module.exports
+    ? require('./shared') : root.HostMonitorShared;
 
   function seed() {
     const now = Date.now();
@@ -58,6 +57,8 @@
       if (validState(saved)) state = saved;
     } catch { /* Storage may be disabled or contain an outdated session. */ }
     if (!state) state = seed();
+    state.monitors = state.monitors.map(m => ({ ...m, group: groupKey(m.group) }));
+    state.groupOrder = [...new Set(state.groupOrder.map(groupKey))];
 
     function save() {
       try { storage?.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -75,6 +76,7 @@
         .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.name.localeCompare(b.name, 'zh-Hant'));
       const up = monitors.filter(m => m.status === 'up').length;
       const down = monitors.filter(m => m.status === 'down').length;
+
       const avgUptime = monitors.length ? monitors.reduce((sum, m) => sum + (m.totalChecks ? m.upChecks / m.totalChecks * 100 : 100), 0) / monitors.length : 0;
       return { monitors, isChecking: false, stats: {
         total: monitors.length, up, down, unknown: monitors.length - up - down,
@@ -126,7 +128,7 @@
       if (url === '/api/groups/order' && method === 'PUT') {
         if (!Array.isArray(body.order) || !body.order.every(g => typeof g === 'string')) return error('order must be an array of strings', 400);
         const existing = groups();
-        state.groupOrder = [...new Set([...body.order.filter(g => existing.includes(g)), ...existing])];
+        state.groupOrder = [...new Set([...body.order.map(groupKey).filter(g => existing.includes(g)), ...existing])];
         save();
         return reply({ success: true, order: state.groupOrder });
       }

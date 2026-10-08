@@ -73,6 +73,10 @@ cp monitors.example.json data/monitors.json
 
 範例 `.env` 明確設定 `LOG_TO_STDOUT=false`。後端直接載入 `.env`，無需額外的 dotenv 套件。
 
+## API 行為
+
+新增／更新主機與更新排序必須提供 JSON object；缺少、破損或非物件 body 回傳 `400 { error }`。內建分類標籤會轉成 `server`、`nas`、`printer`、`edge`，舊資料在載入時正規化，下次成功儲存時寫回。
+
 ## 資料與日誌
 
 - `data/monitors.json`：目標、備註、類別順序、累計檢查次數與最近歷史。

@@ -52,6 +52,52 @@ test('failed persistence rolls back CRUD and order and reports check failure', a
 });
 
 
+test('reserved category keys remain literal labels with stable sorting', async t => {
+  const { request } = await setup(t);
+  for (const [i, group] of ['__proto__', 'constructor', 'toString'].entries()) {
+    assert.equal((await request('/api/monitors', 'POST', { ip: `192.0.2.${i + 1}`, group })).status, 201);
+  }
+  const response = await request('/api/monitors');
+  assert.equal(response.status, 200);
+  assert.deepEqual(new Set(response.body.monitors.map(m => m.groupLabel)), new Set(['__proto__', 'constructor', 'toString']));
+});
+
+test('built-in aliases normalize on CRUD and reload and ordering deduplicates', async t => {
+  const { request, dataFile } = await setup(t);
+  for (const [i, [group, expected]] of [['伺服器', 'server'], ['NAS', 'nas'], ['印表機', 'printer'], ['邊緣版', 'edge'], ['邊緣裝置', 'edge'], ['Custom', 'Custom']].entries()) {
+    const added = await request('/api/monitors', 'POST', { ip: `192.0.2.${i + 1}`, group });
+    assert.equal(added.body.group, expected);
+    assert.equal((await request(`/api/monitors/${added.body.id}`, 'PUT', { group })).body.group, expected);
+  }
+  const order = (await request('/api/groups/order', 'PUT', { order: ['NAS', 'nas', 'missing'] })).body.order;
+  assert.deepEqual(order, ['nas', 'server', 'printer', 'edge', 'Custom']);
+  const saved = JSON.parse(fs.readFileSync(dataFile));
+  saved.monitors[0].group = '伺服器';
+  saved.groupOrder = ['伺服器', 'server', 'NAS', 'nas'];
+  fs.writeFileSync(dataFile, JSON.stringify(saved));
+  const reloaded = await setup(t, { dataFile });
+  assert.equal((await reloaded.request('/api/monitors')).body.monitors.find(m => m.ip === '192.0.2.1').group, 'server');
+  assert.deepEqual((await reloaded.request('/api/groups/order')).body.order, ['server', 'nas']);
+});
+
+test('mutation routes reject missing, non-object and malformed JSON with safe 400 errors', async t => {
+  const { request, base } = await setup(t);
+  await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  for (const [url, method] of [['/api/monitors', 'POST'], ['/api/monitors/192-0-2-1', 'PUT'], ['/api/groups/order', 'PUT']]) {
+    for (const raw of [undefined, 'null', '[]', '1', '"text"', 'true', '{']) {
+      const response = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json' }, body: raw });
+      assert.equal(response.status, 400, `${method} ${url} ${raw}`);
+      const body = await response.json();
+      assert.equal(typeof body.error, 'string');
+      assert.equal(body.stack, undefined);
+    }
+  }
+  for (const body of [{ ip: '192.0.2.3', name: 3 }, { ip: '192.0.2.3', group: {} }, { ip: '192.0.2.3', notes: [] }]) {
+    assert.equal((await request('/api/monitors', 'POST', body)).status, 400);
+  }
+  assert.equal((await request('/api/groups/order', 'PUT', { order: [3] })).status, 400);
+});
+
 test('real check history keeps 60 entries while cumulative counters survive reload with zero RTT', async t => {
   const { request, dataFile } = await setup(t, { config: { manualCheckLimit: 100 }, probe: async () => ({ alive: true, rtt: 0 }) });
   await request('/api/monitors', 'POST', { ip: '192.0.2.1' });

@@ -3,6 +3,7 @@ const ping = require('ping');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const { groupKey, groupLabel } = require('./public/shared');
 
 function generateId(ip) {
   return ip.replaceAll('.', '-');
@@ -70,7 +71,12 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   const DATA_FILE = dataFile;
   const CHECK_INTERVAL = config.checkInterval || 30000;
 
-  app.use(express.json());
+  app.use(express.json({ verify(req, res, buffer) { req.hasJsonBody = buffer.length > 0; } }));
+  app.use((err, req, res, next) => {
+    if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON' });
+    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'JSON body too large' });
+    next(err);
+  });
   app.use(express.static(path.join(__dirname, 'public')));
 
   // In-memory state
@@ -103,7 +109,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
             id: m.id || generateId(m.ip),
             ip: m.ip,
             name: m.name || m.ip,
-            group: m.group || 'server',
+            group: groupKey(m.group),
             status: m.status || 'unknown',
             responseTime: m.responseTime ?? null,
             lastCheck: m.lastCheck || null,
@@ -113,7 +119,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
             notes: m.notes || ''
           }));
           lastGlobalCheck = data.lastGlobalCheck || null;
-          groupOrder = Array.isArray(data.groupOrder) ? data.groupOrder : [];
+          groupOrder = Array.isArray(data.groupOrder) ? [...new Set(data.groupOrder.filter(g => typeof g === 'string').map(groupKey))] : [];
           logger.log(`Loaded ${monitors.length} monitors from ${DATA_FILE}`);
           return;
         }
@@ -232,32 +238,25 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
 
   function getSortedMonitors() {
     const groups = getAllGroups();
-    const grouped = {};
-    groups.forEach(g => { grouped[g] = []; });
+    const grouped = new Map();
+    groups.forEach(g => grouped.set(g, []));
 
     monitors.forEach(m => {
       const g = m.group || 'server';
-      if (!grouped[g]) grouped[g] = [];
-      grouped[g].push(m);
+      if (!grouped.has(g)) grouped.set(g, []);
+      grouped.get(g).push(m);
     });
 
     // 每組內部排序
-    Object.keys(grouped).forEach(g => {
-      grouped[g].sort((a, b) => (a.name || a.ip).localeCompare(b.name || b.ip, 'zh-Hant'));
+    grouped.forEach(items => {
+      items.sort((a, b) => (a.name || a.ip).localeCompare(b.name || b.ip, 'zh-Hant'));
     });
 
     // 展平成陣列，並帶上可讀的 groupLabel（預設用 group 名稱）
     const result = [];
-    // 相容舊資料：把 legacy group key 轉成好看的中文
-    const legacyMap = {
-      nas: 'NAS',
-      edge: '邊緣版',
-      printer: '印表機'
-    };
-
     groups.forEach(g => {
-      const label = g === 'server' ? '伺服器' : (legacyMap[g] || g);
-      grouped[g].forEach(m => {
+      const label = groupLabel(g);
+      grouped.get(g).forEach(m => {
         result.push({ ...m, groupLabel: label });
       });
     });
@@ -290,6 +289,18 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     };
   }
 
+  function requireObject(req, res, next) {
+    if (!req.hasJsonBody || !req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ error: 'Expected a JSON object' });
+    }
+    for (const field of ['name', 'group', 'notes']) {
+      if (req.body[field] !== undefined && typeof req.body[field] !== 'string') {
+        return res.status(400).json({ error: `${field} must be a string` });
+      }
+    }
+    next();
+  }
+
   // === REST API ===
 
   // Get all monitors + stats
@@ -302,7 +313,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   });
 
   // Add new monitor
-  app.post('/api/monitors', (req, res) => {
+  app.post('/api/monitors', requireObject, (req, res) => {
     const { ip, name, group, notes } = req.body;
     if (!ip || typeof ip !== 'string') {
       return res.status(400).json({ error: 'IP is required' });
@@ -323,7 +334,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
       id,
       ip: cleanIp,
       name: name?.trim() ? name.trim() : cleanIp,
-      group: group?.trim() ? group.trim() : 'server',
+      group: groupKey(group),
       status: 'unknown',
       responseTime: null,
       lastCheck: null,
@@ -343,7 +354,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   });
 
   // Update monitor (name / group)
-  app.put('/api/monitors/:id', (req, res) => {
+  app.put('/api/monitors/:id', requireObject, (req, res) => {
     const { id } = req.params;
     const { name, group } = req.body;
 
@@ -358,7 +369,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
 
     if (name && typeof name === 'string') monitor.name = name.trim();
     if (group && typeof group === 'string' && group.trim()) {
-      monitor.group = group.trim();
+      monitor.group = groupKey(group);
     }
     if (typeof req.body.notes === 'string') {
       monitor.notes = req.body.notes.trim();
@@ -395,10 +406,10 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   });
 
   // 更新群組順序
-  app.put('/api/groups/order', (req, res) => {
+  app.put('/api/groups/order', requireObject, (req, res) => {
     const { order } = req.body;
 
-    if (!Array.isArray(order)) {
+    if (!Array.isArray(order) || !order.every(g => typeof g === 'string')) {
       return res.status(400).json({ error: 'order 必須是陣列' });
     }
 
@@ -406,7 +417,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
 
     // 只保留目前實際存在的群組
     const existingGroups = new Set(monitors.map(m => m.group || 'server'));
-    groupOrder = order.filter(g => existingGroups.has(g));
+    groupOrder = [...new Set(order.map(groupKey).filter(g => existingGroups.has(g)))];
 
     // 把新出現但不在 order 裡的群組補上去（放在最後）
     monitors.forEach(m => {
@@ -436,7 +447,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
       return res.status(500).json(dataWriteError());
     }
 
-    const label = monitor.group === 'server' ? '伺服器' : monitor.group;
+    const label = groupLabel(monitor.group);
     res.json({
       ...monitor,
       groupLabel: label || '伺服器'
@@ -484,6 +495,10 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     checkerTimers.forEach(timer => { clearTimeout(timer); clearInterval(timer); });
     checkerTimers.length = 0;
   }
+  app.use((err, req, res, next) => {
+    logger.error('API request failed');
+    res.status(500).json({ error: 'Internal server error' });
+  });
   loadFromFile();
   return { app, startChecker, stopChecker, close: stopChecker };
 }
