@@ -12,5 +12,6 @@ const html = source.replace(marker, '<script>window.HOST_MONITOR_DEMO = true;</s
   .replace('<title>主機監測系統</title>', '<title>Host Monitor · Interactive Demo</title>');
 fs.writeFileSync(path.join(output, 'index.html'), html);
 fs.copyFileSync(path.join(root, 'public/demo.js'), path.join(output, 'demo.js'));
+fs.copyFileSync(path.join(root, 'public/shared.js'), path.join(output, 'shared.js'));
 fs.writeFileSync(path.join(output, '.nojekyll'), '');
 console.log('Static demo built in demo-dist/');

@@ -106,3 +106,16 @@ test('editing a seed category by its visible label keeps the original category',
   const added = await request('/api/monitors', 'POST', { ip: '198.51.100.22', group: '伺服器' });
   assert.equal(added.body.group, 'server');
 });
+
+test('demo normalizes legacy category labels on reload and group ordering', async () => {
+  const { storage } = setup();
+  const state = JSON.parse(storage.getItem());
+  state.monitors[0].group = '伺服器';
+  state.groupOrder = ['伺服器', 'server', 'NAS'];
+  const { request } = setup(JSON.stringify(state));
+  const snapshot = (await request('/api/monitors')).body;
+  assert.equal(snapshot.monitors.find(m => m.ip === '192.0.2.10').group, 'server');
+  const order = (await request('/api/groups/order', 'PUT', { order: ['NAS', 'nas', '伺服器'] })).body.order;
+  assert.deepEqual(order.slice(0, 2), ['nas', 'server']);
+  assert.equal(order.filter(g => g === 'nas').length, 1);
+});
