@@ -49,6 +49,10 @@ test('failed persistence rolls back CRUD and order and reports check failure', a
   assert.equal(snapshot.monitors[0].name, '192.0.2.1');
   assert.equal((await request(url + '/check', 'POST')).status, 500);
   assert.equal((await request('/api/check-all', 'POST')).status, 500);
+  const failedSnapshot = (await request('/api/monitors')).body;
+  assert.equal(failedSnapshot.stats.lastGlobalCheck, null);
+  assert.equal(failedSnapshot.monitors[0].status, 'unknown');
+  assert.equal(failedSnapshot.monitors[0].totalChecks, 0);
 });
 
 

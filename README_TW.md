@@ -75,6 +75,9 @@ cp monitors.example.json data/monitors.json
 | `PROBE_CONCURRENCY` | `5` | 自動與手動檢查共用的 ping 並行上限 |
 | `MAX_MONITORS` | `100` | 新增主機上限；既有超量資料仍保留並監測 |
 | `MANUAL_CHECK_LIMIT` | `10` | 每程序每 60 秒允許的手動檢查請求數，兩個端點共用 |
+| `WEBHOOK_ENABLED` | `false` | 啟用通用 JSON webhook |
+| `WEBHOOK_URL` | 空白 | HTTP／HTTPS 接收端網址 |
+| `WEBHOOK_TIMEOUT_MS` | `5000` | 每次通知的逾時，1–2147483647 毫秒 |
 
 整數設定無效時使用預設值並記錄警告；並行上限、主機上限與手動配額必須是正整數。
 
@@ -84,7 +87,17 @@ cp monitors.example.json data/monitors.json
 
 自動與手動檢查共用排程，同一主機不會重疊 ping。全量檢查遇到進行中的單台工作時共用結果；重複單台或全量請求回傳 `429`。手動配額為程序全域固定 60 秒視窗，包含被拒絕的重複請求；超限回傳 `429` 與 `Retry-After`。自動檢查不使用手動配額。新增超過主機上限回傳 `409`，編輯及刪除仍可使用。
 
-新增／更新主機與更新排序必須提供 JSON object；缺少、破損或非物件 body 回傳 `400 { error }`。`stats.avgUptime` 為數字或 `null`；`null` 表示沒有可計算的檢查紀錄，0 仍表示 0%。內建分類標籤會轉成 `server`、`nas`、`printer`、`edge`，舊資料在載入時正規化，下次成功儲存時寫回。
+新增／更新主機與更新排序必須提供 JSON object；缺少、破損或非物件 body 回傳 `400 { error }`。`stats.avgUptime` 為數字或 `null`；`null` 表示沒有可計算的檢查紀錄，0 仍表示 0%。檢查結果儲存失敗會回復狀態、歷史與計數，該次檢查不納入可用率；成功寫入的結果才觸發通知。內建分類標籤會轉成 `server`、`nas`、`printer`、`edge`，舊資料在載入時正規化，下次成功儲存時寫回。
+
+## Webhook 通知
+
+設定 `WEBHOOK_ENABLED=true` 與 `WEBHOOK_URL`，重新啟動後啟用。結果成功儲存後，只在 `up→down`、`down→up` 發送通知；首次未知狀態、相同狀態與 demo 不發送。HTTP／HTTPS 接收端收到以下 JSON：
+
+```json
+{"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}
+```
+
+通知背景發送，最多 2 個工作與 100 筆等待事件；滿載丟棄新事件並記錄警告。逾時或 HTTP 失敗不阻塞監測、不重試；重啟會丟失等待事件。無效 URL 會停用通知並記錄不含秘密的警告。URL、token 與回應內容不寫入日誌。第一版無連續失敗門檻、冷卻或持久化重送；Discord／Slack 請使用接收通用 JSON 的轉接服務。
 
 ## 資料與日誌
 
@@ -149,7 +162,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo、設定及 Linux 腳本、排程。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
+`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端、demo、設定、排程、Linux 腳本與 webhook。後端資料寫入臨時目錄，ping 使用 mock，通知使用本機 HTTP receiver，不需真實 ICMP 或外部服務。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
 
 ## License
 

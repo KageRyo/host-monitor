@@ -3,6 +3,7 @@ const ping = require('ping');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const { createNotifier } = require('./notifications');
 const { readConfig } = require('./config');
 const { createProbeScheduler, createManualLimiter } = require('./scheduler');
 const { groupKey, groupLabel, averageUptime } = require('./public/shared');
@@ -68,6 +69,8 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   probe: injectedProbe, logger = console, config = {} } = {}) {
   config = { ...readConfig({}, logger), ...config };
   const checkerTimers = [];
+  const notifier = createNotifier({ enabled: config.webhookEnabled, url: config.webhookUrl,
+    timeoutMs: config.webhookTimeoutMs, logger });
   const probe = injectedProbe || realProbe;
   const app = express();
   app.disable('x-powered-by');
@@ -176,8 +179,17 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     try { result = await probe(monitor.ip); }
     catch { result = { alive: false, rtt: null }; }
     if (!monitors.includes(monitor)) return true;
+    const previous = { ...monitor, history: monitor.history.slice() };
+    const previousStatus = monitor.status;
     updateMonitor(monitor, result);
     const saved = saveToFile();
+    if (!saved) Object.assign(monitor, previous);
+    if (saved && ['up', 'down'].includes(previousStatus) && previousStatus !== monitor.status) {
+      notifier.notify({ event: 'monitor.status_changed',
+        monitor: { id: monitor.id, ip: monitor.ip, name: monitor.name, group: monitor.group },
+        previousStatus, status: monitor.status, checkedAt: monitor.lastCheck,
+        responseTime: monitor.responseTime });
+    }
     return saved;
   } });
   const acquireManualCheck = createManualLimiter({ limit: config.manualCheckLimit });
@@ -196,8 +208,10 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     try {
       logger.log(`Running checks for ${monitors.length} monitors...`);
       const results = await Promise.all(monitors.slice().map(m => scheduler.enqueue(m)));
+      const previousGlobalCheck = lastGlobalCheck;
       lastGlobalCheck = new Date().toISOString();
       const saved = saveToFile();
+      if (!saved) lastGlobalCheck = previousGlobalCheck;
       if (!saved || results.some(result => !result)) {
         logger.error('Checks completed but results could not be saved.');
         return false;
@@ -511,6 +525,6 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     res.status(500).json({ error: 'Internal server error' });
   });
   loadFromFile();
-  return { app, startChecker, stopChecker, close: stopChecker };
+  return { app, startChecker, stopChecker, close: () => { stopChecker(); notifier.close(); } };
 }
 module.exports = { createApp };
