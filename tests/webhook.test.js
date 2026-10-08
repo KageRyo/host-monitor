@@ -134,3 +134,17 @@ for (const recoveryAlive of [false, true]) {
     assert.deepEqual(events.map(e => [e.previousStatus, e.status]), recoveryAlive ? [] : [['up', 'down']]);
   });
 }
+
+test('closing the notifier discards waiting events and prevents later delivery', async t => {
+  let received = 0;
+  const url = await receiver(t, req => { received++; req.resume(); });
+  const { createNotifier } = require('../notifications');
+  const notifier = createNotifier({ enabled: true, url, timeoutMs: 10000 });
+  t.after(() => notifier.close());
+  for (let i = 0; i < 4; i++) notifier.notify({ event: 'test' });
+  await waitFor(() => received === 2);
+  notifier.close();
+  notifier.notify({ event: 'after-close' });
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(received, 2);
+});

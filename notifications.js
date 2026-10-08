@@ -6,7 +6,7 @@ function createNotifier({ enabled = false, url = '', timeoutMs = 5000, logger = 
   if (enabled) {
     try {
       target = new URL(url);
-      if (!['http:', 'https:'].includes(target.protocol)) throw new Error();
+      if (!['http:', 'https:'].includes(target.protocol)) throw new Error('Unsupported webhook protocol');
     } catch {
       logger.warn('Webhook URL invalid; notifications disabled');
       enabled = false;
@@ -16,7 +16,8 @@ function createNotifier({ enabled = false, url = '', timeoutMs = 5000, logger = 
   const requests = new Set();
   let active = 0, closed = false;
   function drain() {
-    while (!closed && active < 2 && queue.length) {
+    if (closed) return;
+    while (active < 2 && queue.length) {
       const body = queue.shift();
       active++;
       let request, timer, settled = false;
