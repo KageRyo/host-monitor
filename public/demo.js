@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const STORAGE_KEY = 'host-monitor-demo:v1';
-  const { groupKey, groupLabel } = typeof module !== 'undefined' && module.exports
+  const { groupKey, groupLabel, averageUptime } = typeof module !== 'undefined' && module.exports
     ? require('./shared') : root.HostMonitorShared;
 
   function seed() {
@@ -77,10 +77,9 @@
       const up = monitors.filter(m => m.status === 'up').length;
       const down = monitors.filter(m => m.status === 'down').length;
 
-      const avgUptime = monitors.length ? monitors.reduce((sum, m) => sum + (m.totalChecks ? m.upChecks / m.totalChecks * 100 : 100), 0) / monitors.length : 0;
       return { monitors, isChecking: false, stats: {
         total: monitors.length, up, down, unknown: monitors.length - up - down,
-        avgUptime: Math.round(avgUptime * 10) / 10, lastGlobalCheck: state.lastGlobalCheck
+        avgUptime: averageUptime(monitors), lastGlobalCheck: state.lastGlobalCheck
       } };
     }
 

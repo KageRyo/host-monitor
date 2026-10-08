@@ -98,6 +98,16 @@ test('mutation routes reject missing, non-object and malformed JSON with safe 40
   assert.equal((await request('/api/groups/order', 'PUT', { order: [3] })).status, 400);
 });
 
+test('uptime excludes unchecked hosts and distinguishes zero from unknown', async t => {
+  const { request } = await setup(t, { probe: async () => ({ alive: false, rtt: null }) });
+  assert.equal((await request('/api/monitors')).body.stats.avgUptime, null);
+  await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  await request('/api/monitors', 'POST', { ip: '192.0.2.2' });
+  assert.equal((await request('/api/monitors')).body.stats.avgUptime, null);
+  await request('/api/monitors/192-0-2-1/check', 'POST');
+  assert.equal((await request('/api/monitors')).body.stats.avgUptime, 0);
+});
+
 test('real check history keeps 60 entries while cumulative counters survive reload with zero RTT', async t => {
   const { request, dataFile } = await setup(t, { config: { manualCheckLimit: 100 }, probe: async () => ({ alive: true, rtt: 0 }) });
   await request('/api/monitors', 'POST', { ip: '192.0.2.1' });

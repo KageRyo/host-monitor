@@ -107,6 +107,17 @@ test('editing a seed category by its visible label keeps the original category',
   assert.equal(added.body.group, 'server');
 });
 
+test('demo average excludes unchecked monitors and represents all unchecked as null', async () => {
+  const { storage, request } = setup();
+  const state = JSON.parse(storage.getItem());
+  state.monitors.forEach(m => { m.totalChecks = 0; m.upChecks = 0; m.history = []; });
+  const unchecked = setup(JSON.stringify(state));
+  assert.equal((await unchecked.request('/api/monitors')).body.stats.avgUptime, null);
+  state.monitors[0].totalChecks = 4;
+  state.monitors[0].upChecks = 1;
+  assert.equal((await setup(JSON.stringify(state)).request('/api/monitors')).body.stats.avgUptime, 25);
+});
+
 test('demo normalizes legacy category labels on reload and group ordering', async () => {
   const { storage } = setup();
   const state = JSON.parse(storage.getItem());

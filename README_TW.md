@@ -24,7 +24,7 @@
 | 外觀 | 明暗主題，目前介面為正體中文 |
 | 儲存 | 本地 JSON，無需資料庫服務 |
 
-可用率依累計檢查的成功比例計算；每台主機另外保留最近 60 筆歷史。ping 成功表示網路可達，不代表 HTTP 服務或應用程式正常。
+可用率依累計檢查的成功比例計算；尚未檢查的主機顯示 `—`，全域平均排除這些主機，全部未檢查時也顯示 `—`。每台主機另外保留最近 60 筆歷史。ping 成功表示網路可達，不代表 HTTP 服務或應用程式正常。
 
 ## 快速開始
 
@@ -79,7 +79,7 @@ cp monitors.example.json data/monitors.json
 
 ## API 行為
 
-新增／更新主機與更新排序必須提供 JSON object；缺少、破損或非物件 body 回傳 `400 { error }`。內建分類標籤會轉成 `server`、`nas`、`printer`、`edge`，舊資料在載入時正規化，下次成功儲存時寫回。
+新增／更新主機與更新排序必須提供 JSON object；缺少、破損或非物件 body 回傳 `400 { error }`。`stats.avgUptime` 為數字或 `null`；`null` 表示沒有可計算的檢查紀錄，0 仍表示 0%。內建分類標籤會轉成 `server`、`nas`、`printer`、`edge`，舊資料在載入時正規化，下次成功儲存時寫回。
 
 ## 資料與日誌
 
@@ -144,7 +144,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo、設定及 Linux 腳本。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo 操作。
+`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端與 demo、設定及 Linux 腳本。後端資料寫入臨時目錄，ping 使用 mock，不需真實 ICMP。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
 
 ## License
 
