@@ -9,7 +9,16 @@
     return aliases.get(group) || group;
   }
   const groupLabel = group => labels.get(group) || group;
-  const shared = { groupKey, groupLabel };
+  function uptime(monitor) {
+    return monitor.totalChecks > 0 ? Math.round(monitor.upChecks / monitor.totalChecks * 1000) / 10 : null;
+  }
+  function averageUptime(monitors) {
+    const checked = monitors.filter(m => m.totalChecks > 0);
+    if (!checked.length) return null;
+    const average = checked.reduce((sum, m) => sum + m.upChecks / m.totalChecks * 100, 0) / checked.length;
+    return Math.round(average * 10) / 10;
+  }
+  const shared = { groupKey, groupLabel, uptime, averageUptime };
   if (typeof module !== 'undefined' && module.exports) module.exports = shared;
   else root.HostMonitorShared = shared;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

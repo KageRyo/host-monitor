@@ -332,6 +332,7 @@
   </div>
 
   <!-- DEMO_CONFIG -->
+  <script src="./api.js"></script>
   <script src="./shared.js"></script>
   <script src="./demo.js"></script>
   <script>
@@ -341,7 +342,7 @@
     let demoStorage;
     try { demoStorage = window.localStorage; } catch { /* Use in-memory demo state. */ }
     const demoApi = isDemo ? createDemoApi(demoStorage) : null;
-    const apiRequest = demoApi ? demoApi.request : window.fetch.bind(window);
+    const apiRequest = createJsonRequest(demoApi ? demoApi.request : window.fetch.bind(window));
     let currentMonitors = [];
     let currentModalId = null;
     let currentViewingMonitor = null;   // 用來記錄目前打開的詳細視窗是哪一台
@@ -424,9 +425,12 @@
       return new Date(iso).toLocaleString('zh-TW', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
     }
 
-    function getUptime(m) {
-      if (!m.totalChecks || m.totalChecks === 0) return 100;
-      return Math.round((m.upChecks / m.totalChecks) * 1000) / 10;
+    const getUptime = HostMonitorShared.uptime;
+    const formatUptime = value => value === null || value === undefined ? '—' : value.toFixed(1) + '%';
+    function showApiError(error, fallback) {
+      const message = error.status === 429 && error.message === 'Check already in progress'
+        ? '檢查中，請稍候' : error.message || fallback;
+      showToast(message, true);
     }
 
     function showToast(message, error = false) {
@@ -472,7 +476,7 @@
         </div>
         <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 col-span-2 sm:col-span-1">
           <div class="text-xs text-slate-400">平均可用率</div>
-          <div class="text-4xl font-semibold text-slate-800 dark:text-white mt-1 tabular-nums">${(stats.avgUptime || 0).toFixed(1)}<span class="text-lg font-normal">%</span></div>
+          <div class="text-4xl font-semibold text-slate-800 dark:text-white mt-1 tabular-nums">${formatUptime(stats.avgUptime)}</div>
         </div>
       `;
 
@@ -526,7 +530,7 @@
 
         showToast('群組順序已儲存');
       } catch (e) {
-        showToast('儲存順序失敗', true);
+        showApiError(e, '儲存順序失敗');
       }
     }
 
@@ -602,7 +606,7 @@
           <div class="text-right">
             <div class="text-xs text-slate-400">${monitor.lastCheck ? formatTimeAgo(monitor.lastCheck) : '未檢查'}</div>
             <div class="text-xs mt-0.5">
-              可用率 <span class="font-semibold text-emerald-600">${uptime.toFixed(1)}%</span>
+              可用率 <span class="font-semibold text-emerald-600">${formatUptime(uptime)}</span>
             </div>
           </div>
         </div>
@@ -718,14 +722,13 @@
     // ==================== 重新整理 ====================
     async function refreshUI(silent = false) {
       try {
-        const res = await apiRequest(`${API_BASE}/monitors`);
-        const data = await res.json();
+        const data = await apiRequest(`${API_BASE}/monitors`);
         currentMonitors = data.monitors || [];
         window.lastStats = data.stats || {};
         renderGlobalStats(window.lastStats);
         renderGroups(currentMonitors);
       } catch (e) {
-        if (!silent) showToast('無法取得最新狀態', true);
+        if (!silent) showApiError(e, '無法取得最新狀態');
       }
     }
 
@@ -749,7 +752,7 @@
       document.getElementById('modal-rtt').innerHTML = monitor.responseTime != null 
         ? `${monitor.responseTime}<span class="text-base font-normal text-slate-400">ms</span>` : '—';
       
-      document.getElementById('modal-uptime').textContent = getUptime(monitor).toFixed(1) + '%';
+      document.getElementById('modal-uptime').textContent = formatUptime(getUptime(monitor));
       document.getElementById('modal-last').textContent = formatDateTime(monitor.lastCheck);
 
       // Notes
@@ -797,8 +800,7 @@
       if (!currentModalId) return;
       try {
         const checkedId = currentModalId;
-        const res = await apiRequest(`${API_BASE}/monitors/${checkedId}/check`, { method: 'POST' });
-        const updated = await res.json();
+        const updated = await apiRequest(`${API_BASE}/monitors/${checkedId}/check`, { method: 'POST' });
         showToast('檢查完成');
         const idx = currentMonitors.findIndex(m => m.id === currentModalId);
         if (idx > -1) currentMonitors[idx] = updated;
@@ -806,17 +808,21 @@
         await refreshUI(true);
         const fresh = currentMonitors.find(m => m.id === checkedId);
         if (fresh) showDetailModal(fresh);
-      } catch {
-        showToast('檢查失敗', true);
+      } catch (e) {
+        showApiError(e, '檢查失敗');
       }
     }
 
     async function deleteFromModal() {
       if (!currentModalId || !confirm('確定要刪除此監測項目嗎？')) return;
-      await apiRequest(`${API_BASE}/monitors/${currentModalId}`, { method: 'DELETE' });
-      showToast('已刪除');
-      hideDetailModal();
-      await refreshUI(true);
+      try {
+        await apiRequest(`${API_BASE}/monitors/${currentModalId}`, { method: 'DELETE' });
+        showToast('已刪除');
+        hideDetailModal();
+        await refreshUI(true);
+      } catch (e) {
+        showApiError(e, '刪除失敗');
+      }
     }
 
     // ==================== 新增/編輯 ====================
@@ -916,30 +922,27 @@
       try {
         const url = editingId ? `${API_BASE}/monitors/${editingId}` : `${API_BASE}/monitors`;
         const method = editingId ? 'PUT' : 'POST';
-        const res = await apiRequest(url, {
+        await apiRequest(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editingId ? { name: payload.name, group, notes: payload.notes } : payload)
         });
-        if (!res.ok) throw new Error((await res.json()).error || '失敗');
         hideFormModal();
         showToast(editingId ? '已更新' : '新增成功');
         await refreshUI(true);
       } catch (e) {
-        showToast(e.message || '操作失敗', true);
+        showApiError(e, '操作失敗');
       }
     }
 
     // ==================== 全部檢查 ====================
     async function checkAllNow() {
       try {
-        const res = await apiRequest(`${API_BASE}/check-all`, { method: 'POST' });
-        if (res.status === 429) { showToast('檢查中，請稍候', true); return; }
-        await res.json();
+        await apiRequest(`${API_BASE}/check-all`, { method: 'POST' });
         showToast('已完成全部檢查');
         await refreshUI(true);
-      } catch {
-        showToast('檢查失敗', true);
+      } catch (e) {
+        showApiError(e, '檢查失敗');
       }
     }
 

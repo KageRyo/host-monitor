@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { readConfig } = require('./config');
-const { groupKey, groupLabel } = require('./public/shared');
+const { groupKey, groupLabel, averageUptime } = require('./public/shared');
 
 function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   probe: injectedProbe, logger = console, config = {} } = {}) {
@@ -271,21 +271,12 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     const unknown = total - up - down;
 
 
-    let avgUptime = 0;
-    if (total > 0) {
-      const uptimes = monitors.map(m => {
-        if (!m.totalChecks || m.totalChecks === 0) return 100;
-        return (m.upChecks / m.totalChecks) * 100;
-      });
-      avgUptime = uptimes.reduce((a, b) => a + b, 0) / total;
-    }
-
     return {
       total,
       up,
       down,
       unknown,
-      avgUptime: Math.round(avgUptime * 10) / 10,
+      avgUptime: averageUptime(monitors),
       lastGlobalCheck
     };
   }
