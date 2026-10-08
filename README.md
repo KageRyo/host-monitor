@@ -26,6 +26,8 @@ A lightweight, self-hosted dashboard for checking whether servers, NAS devices, 
 
 Uptime is the percentage of successful recorded checks. Each host retains its latest 60 history entries, while its cumulative check counters are stored separately. A successful ping indicates network reachability; it does not verify the health of an HTTP service or application.
 
+Unchecked hosts show `—` for uptime and are excluded from the global average. If every host is unchecked, the average also shows `—`.
+
 ## Quick start
 
 You need Node.js 18 or newer, npm, and a working system `ping` command. The Bash helpers also require `setsid` and standard Linux process utilities; use `npm start` for foreground execution on other platforms with a compatible ping utility.
@@ -81,7 +83,7 @@ The example `.env` explicitly sets `LOG_TO_STDOUT=false`. The server loads `.env
 
 ## API behavior
 
-Creating/updating monitors and saving group order require a JSON object. Missing, malformed, or non-object bodies return `400 { error }`. Built-in category labels normalize to `server`, `nas`, `printer`, and `edge`. Legacy data normalizes on load and is written back on the next successful save.
+Creating/updating monitors and saving group order require a JSON object. Missing, malformed, or non-object bodies return `400 { error }`. `stats.avgUptime` is a number or `null`; `null` means no recorded checks, while 0 means 0%. Built-in category labels normalize to `server`, `nas`, `printer`, and `edge`. Legacy data normalizes on load and is written back on the next successful save.
 
 ## Data and logs
 
@@ -150,7 +152,7 @@ node --check server.js
 npm start
 ```
 
-`npm test` uses Node.js’s built-in runner for backend and demo, configuration and Linux helpers suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions.
+`npm test` uses Node.js’s built-in runner for backend and demo, configuration and Linux helpers suites. Backend data lives in temporary directories and probes are mocked; no real ICMP is needed. CI also runs `npm run test:browser` for demo interactions, real API/data flows, and failure UI.
 
 ## License
 

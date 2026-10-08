@@ -5,7 +5,10 @@
 - Add isolated integration tests for the real Express backend, history/reload behavior, and persistence errors.
 - Fix reserved category keys, built-in/legacy category normalization, ordering deduplication, and malformed/non-object JSON validation.
 - Validate HTTP port and check interval; preserve 0ms RTT when reloading saved results.
+- Show unknown uptime as `—`, exclude unchecked hosts from averages, and return `stats.avgUptime: null` when no checks exist.
+- Handle non-2xx, proxy, and network errors consistently in dashboard actions without success toasts or lost forms.
 - Verify Linux process identity before TERM/KILL; remove broad process-name termination and clean stale PID records safely.
+- Expand browser verification to cover real backend/data flows and error responses; document configuration and compatibility in both READMEs.
 
 
 ## 0.1.0
