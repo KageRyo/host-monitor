@@ -16,7 +16,8 @@ async function setup(t, options = {}) {
     fs.rmSync(dir, { recursive: true, force: true });
   });
   const base = `http://127.0.0.1:${server.address().port}`;
-  async function request(url, method = 'GET', body) {
+  async function request(url, method, body) {
+    if (method === undefined) method = 'GET';
     const response = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body) });
     return { status: response.status, body: await response.json(), headers: response.headers };
