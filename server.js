@@ -161,8 +161,8 @@ function getLocalIPs() {
 
 // Boot
 const { createApp } = require('./app');
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL || '30000', 10);
+const PORT = Number.parseInt(process.env.PORT || '3000', 10);
+const CHECK_INTERVAL = Number.parseInt(process.env.CHECK_INTERVAL || '30000', 10);
 const backend = createApp({ config: { checkInterval: CHECK_INTERVAL } });
 backend.startChecker();
 
