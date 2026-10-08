@@ -6,6 +6,63 @@ const net = require('node:net');
 const { readConfig } = require('./config');
 const { groupKey, groupLabel } = require('./public/shared');
 
+function generateId(ip) {
+  return ip.replaceAll('.', '-');
+}
+
+function normalizeIpv4(value) {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim();
+  return net.isIP(clean) === 4 ? clean : null;
+}
+
+function dataWriteError() {
+  return {
+    error: '資料儲存失敗，請確認磁碟空間與 data/ 目錄權限後再試一次'
+  };
+}
+
+async function realProbe(ip) {
+  try {
+    const res = await ping.promise.probe(ip, {
+      timeout: 3,
+      min_reply: 1,
+      numeric: true
+    });
+    const alive = !!res.alive;
+    let rtt = null;
+    if (alive) {
+      const t = res.time;
+      if (typeof t === 'number') rtt = Math.round(t);
+      else if (typeof t === 'string' && t !== 'unknown') rtt = Math.round(Number.parseFloat(t));
+    }
+    return { alive, rtt };
+  } catch {
+    // A failed ping is a down result; raw probe errors do not change the API response.
+    return { alive: false, rtt: null };
+  }
+}
+
+function updateMonitor(monitor, result) {
+  const now = new Date();
+
+  monitor.status = result.alive ? 'up' : 'down';
+  monitor.responseTime = result.rtt;
+  monitor.lastCheck = now.toISOString();
+
+  monitor.totalChecks = (monitor.totalChecks || 0) + 1;
+  if (result.alive) monitor.upChecks = (monitor.upChecks || 0) + 1;
+
+  monitor.history.push({
+    time: now.toISOString(),
+    alive: result.alive,
+    rtt: result.rtt
+  });
+  if (monitor.history.length > 60) {
+    monitor.history.shift();
+  }
+}
+
 function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   probe: injectedProbe, logger = console, config = {} } = {}) {
   config = { ...readConfig({}, logger), ...config };
@@ -29,22 +86,6 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   let groupOrder = [];           // 自訂的群組順序
   let lastGlobalCheck = null;
   let isChecking = false;
-
-  function generateId(ip) {
-    return ip.replace(/\./g, '-');
-  }
-
-  function normalizeIpv4(value) {
-    if (typeof value !== 'string') return null;
-    const clean = value.trim();
-    return net.isIP(clean) === 4 ? clean : null;
-  }
-
-  function dataWriteError() {
-    return {
-      error: '資料儲存失敗，請確認磁碟空間與 data/ 目錄權限後再試一次'
-    };
-  }
 
   function archiveCorruptDataFile() {
     if (!fs.existsSync(DATA_FILE)) return;
@@ -125,46 +166,6 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
         }
       }
       return false;
-    }
-  }
-
-  async function realProbe(ip) {
-    try {
-      const res = await ping.promise.probe(ip, {
-        timeout: 3,
-        min_reply: 1,
-        numeric: true
-      });
-      const alive = !!res.alive;
-      let rtt = null;
-      if (alive) {
-        const t = res.time;
-        if (typeof t === 'number') rtt = Math.round(t);
-        else if (typeof t === 'string' && t !== 'unknown') rtt = Math.round(parseFloat(t));
-      }
-      return { alive, rtt };
-    } catch (err) {
-      return { alive: false, rtt: null };
-    }
-  }
-
-  function updateMonitor(monitor, result) {
-    const now = new Date();
-
-    monitor.status = result.alive ? 'up' : 'down';
-    monitor.responseTime = result.rtt;
-    monitor.lastCheck = now.toISOString();
-
-    monitor.totalChecks = (monitor.totalChecks || 0) + 1;
-    if (result.alive) monitor.upChecks = (monitor.upChecks || 0) + 1;
-
-    monitor.history.push({
-      time: now.toISOString(),
-      alive: result.alive,
-      rtt: result.rtt
-    });
-    if (monitor.history.length > 60) {
-      monitor.history.shift();
     }
   }
 
@@ -271,7 +272,6 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     const down = monitors.filter(m => m.status === 'down').length;
     const unknown = total - up - down;
 
-
     let avgUptime = 0;
     if (total > 0) {
       const uptimes = monitors.map(m => {
@@ -328,14 +328,14 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
 
     const id = generateId(cleanIp);
 
-    if (monitors.find(m => m.id === id)) {
+    if (monitors.some(m => m.id === id)) {
       return res.status(409).json({ error: 'Monitor with this IP already exists' });
     }
 
     const newMonitor = {
       id,
       ip: cleanIp,
-      name: name && name.trim() ? name.trim() : cleanIp,
+      name: name?.trim() ? name.trim() : cleanIp,
       group: groupKey(group),
       status: 'unknown',
       responseTime: null,
@@ -483,15 +483,15 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   function startChecker() {
     // First check shortly after start
     if (checkerTimers.length) return;
-    checkerTimers.push(setTimeout(() => {
-      runAllChecks().catch(logger.error);
-    }, 1500));
-
-    checkerTimers.push(setInterval(() => {
-      runAllChecks().catch(logger.error);
-    }, CHECK_INTERVAL));
+    checkerTimers.push(
+      setTimeout(() => {
+        runAllChecks().catch(logger.error);
+      }, 1500),
+      setInterval(() => {
+        runAllChecks().catch(logger.error);
+      }, CHECK_INTERVAL)
+    );
   }
-
 
   function stopChecker() {
     checkerTimers.forEach(timer => { clearTimeout(timer); clearInterval(timer); });
