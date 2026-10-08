@@ -41,6 +41,9 @@ function readConfig(env = process.env, logger = console) {
     probeConcurrency: integer('PROBE_CONCURRENCY', 5, 1),
     maxMonitors: integer('MAX_MONITORS', 100, 1),
     manualCheckLimit: integer('MANUAL_CHECK_LIMIT', 10, 1),
+    webhookEnabled: readBooleanEnv('WEBHOOK_ENABLED', false, env),
+    webhookUrl: env.WEBHOOK_URL || '',
+    webhookTimeoutMs: integer('WEBHOOK_TIMEOUT_MS', 5000, 1, 2147483647)
   };
 }
 module.exports = { loadEnvFile, readIntegerEnv, readBooleanEnv, readConfig };
