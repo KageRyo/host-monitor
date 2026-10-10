@@ -36,39 +36,44 @@ const server = http.createServer((req, res) => {
     const origin = `http://127.0.0.1:${port}`;
     const externalRequests = [];
     const assetFailures = [];
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-        const errors = [], apiRequests = [];
+    const localAssetResponses = new Map();
+    const errors = [];
+    const apiRequests = [];
     let cssResponse = null;
 
+    // Use a dedicated browser context so the offline checks cannot inherit state.
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const page = await context.newPage();
+
+    // Register listeners before navigation so the first asset requests are observed.
     page.on('response', response => {
       const url = new URL(response.url());
+      const contentType = response.headers()['content-type'] || '';
+      const isLocalAsset = url.origin === origin && /\.(?:css|js)$/.test(url.pathname);
+
+      if (isLocalAsset) {
+        localAssetResponses.set(url.pathname, { status: response.status(), contentType });
+        if (response.status() >= 400) assetFailures.push(`${response.status()} ${url.href}`);
+      }
 
       if (url.pathname === '/host-monitor/styles.css') {
-        cssResponse = {
-          status: response.status(),
-          contentType: response.headers()['content-type'] || ''
-        };
+        cssResponse = { status: response.status(), contentType };
       }
     });
 
-    await page.route('**/*', async route => {
-      const url = new URL(route.request().url());
+    page.on('requestfailed', request => {
+      const url = new URL(request.url());
+      if (!url.pathname.startsWith('/api/')) assetFailures.push(request.url());
+    });
 
+    await context.route('**/*', async route => {
+      const url = new URL(route.request().url());
       if (['http:', 'https:'].includes(url.protocol) && url.origin !== origin) {
         externalRequests.push(url.href);
         await route.abort();
         return;
       }
-
       await route.continue();
-    });
-
-              page.on('requestfailed', request => {
-      const url = new URL(request.url());
-
-      if (!url.pathname.startsWith('/api/')) {
-        assetFailures.push(request.url());
-      }
     });
 
     page.on('pageerror', error => errors.push(error.message));
@@ -81,6 +86,11 @@ const server = http.createServer((req, res) => {
     assert.match(cssResponse.contentType, /text\/css/i, 'local CSS must have text/css content type');
     assert.deepEqual(externalRequests, [], 'demo must not request external HTTP(S) assets');
     assert.deepEqual(assetFailures, [], 'local assets must not fail to load');
+    assert.ok(localAssetResponses.has('/host-monitor/styles.css'), 'demo stylesheet must load locally');
+    assert.ok([...localAssetResponses.keys()].some(url => url.endsWith('.js')), 'demo JavaScript must load locally');
+    for (const [url, result] of localAssetResponses) {
+      assert.equal(result.status, 200, `local CSS/JS asset must return HTTP 200: ${url}`);
+    }
 
     const bodyFont = await page.locator('body').evaluate(element =>
       getComputedStyle(element).fontFamily
@@ -88,11 +98,27 @@ const server = http.createServer((req, res) => {
     assert.ok(bodyFont.length > 0, 'page must have a computed font');
     assert.equal(await page.locator('.monitor-card').count(), 8);
     assert.ok(await page.locator('#demo-banner').isVisible());
+
+    // Verify real computed styles, not just that a stylesheet was requested.
+    const firstCard = page.locator('.monitor-card').first();
+    assert.equal(await firstCard.evaluate(element => getComputedStyle(element).padding), '16px', 'monitor cards must have 16px padding');
+    assert.equal(await firstCard.evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(255, 255, 255)', 'light theme monitor cards must have a white background');
+   const icon = page.locator('svg').first();
+   assert.ok(await icon.count() > 0, 'page must include an inline SVG icon');
+   assert.ok(await icon.isVisible(), 'inline SVG icon must be visible');
+
+   const iconBox = await icon.boundingBox();
+   assert.ok(
+     iconBox && iconBox.width > 0 && iconBox.height > 0,
+     'inline SVG icon must have non-zero dimensions'
+   );
+
     await page.evaluate(() => setFilter('down'));
     assert.equal(await page.locator('.monitor-card').count(), 2);
     await page.evaluate(() => setFilter('all'));
     await page.evaluate(() => toggleTheme());
     assert.ok(await page.evaluate(() => ['dark', 'light'].includes(localStorage.getItem('theme'))));
+    assert.equal(await firstCard.evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(15, 23, 42)', 'dark theme monitor cards must have a slate background');
     await page.evaluate(() => showAddModal());
     await page.fill('#form-ip', '198.51.100.7');
     await page.fill('#form-name', '<img src=x onerror="window.injected=true">');
@@ -137,6 +163,9 @@ const server = http.createServer((req, res) => {
     await page.screenshot({ path: path.join(os.tmpdir(), 'host-monitor-demo-mobile.png'), fullPage: true });
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('nav button')].every(button => { const rect = button.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= 64 && rect.right <= innerWidth; })), 'mobile navigation buttons must fit');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile page must fit viewport');
+    // The offline demo checks above are complete; close their isolated context.
+    await context.close();
+
     // Fresh browser with disabled storage must still render and allow edits.
     const blocked = await browser.newPage();
     await blocked.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage disabled'); } }));
