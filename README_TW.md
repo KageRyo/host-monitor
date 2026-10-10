@@ -131,7 +131,11 @@ pm2 startup
 
 靜態 demo 沿用現有儀表板，提供八台虛構主機、上線／離線狀態與每 30 秒一次的模擬檢查。可以新增、編輯、刪除主機、手動檢查、排序類別、篩選狀態與切換主題。**不會連線到輸入的位址**，頁面上方有明確的模擬資料提示。
 
+<<<<<<< HEAD
 變更以獨立的 localStorage key 保存在訪客瀏覽器，按「重設 Demo」可還原範例。停用瀏覽器儲存時仍可操作，但重新整理會重設。
+=======
+變更以獨立的 localStorage key 保存在訪客瀏覽器，按「重設 Demo」可還原範例。停用瀏覽器儲存時仍可操作，但重新整理會重設。樣式使用本機建置的 Tailwind CSS，圖示使用內嵌 SVG，字型使用系統字型，因此不需要外部 CDN 即可顯示。
+>>>>>>> d3b11a7 (Improve offline asset verification)
 
 樣式使用本地生成的 Tailwind CSS，圖示使用 inline SVG，字型使用系統字型。Demo 執行時不需要外部 CSS、圖示或字型 CDN。
 
@@ -157,9 +161,13 @@ python3 -m http.server 8080 --directory demo-dist
 
 ## 開發
 
+<<<<<<< HEAD
 後端使用 Express 5 與 `ping` 套件；前端使用 Vanilla JavaScript 與 Tailwind CSS，搭配本地生成的 CSS、inline SVG 圖示與系統字型。執行時不需要外部 CSS、圖示或字型 CDN。
 
 安裝開發依賴：
+=======
+後端使用 Express 5 與 `ping` 套件；前端為 Vanilla JavaScript 與 Tailwind CSS。CSS 由本機建置，圖示使用內嵌 SVG，字型使用系統字型，不依賴外部 CDN。
+>>>>>>> d3b11a7 (Improve offline asset verification)
 
 ```bash
 npm install
@@ -183,6 +191,8 @@ npm run build:demo
 npm test
 node --check server.js
 npm start
+npm run build:css
+npm run build:demo
 ```
 
 `npm test` 使用 Node.js 內建測試工具，分開驗證正式後端、demo、設定、排程、Linux 腳本與 webhook。後端資料寫入臨時目錄，ping 使用 mock，通知使用本機 HTTP receiver，不需真實 ICMP 或外部服務。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。

@@ -33,13 +33,59 @@ const server = http.createServer((req, res) => {
   const port = server.address().port;
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
   try {
+    const origin = `http://127.0.0.1:${port}`;
+    const externalRequests = [];
+    const assetFailures = [];
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-    const errors = [], apiRequests = [];
+        const errors = [], apiRequests = [];
+    let cssResponse = null;
+
+    page.on('response', response => {
+      const url = new URL(response.url());
+
+      if (url.pathname === '/host-monitor/styles.css') {
+        cssResponse = {
+          status: response.status(),
+          contentType: response.headers()['content-type'] || ''
+        };
+      }
+    });
+
+    await page.route('**/*', async route => {
+      const url = new URL(route.request().url());
+
+      if (['http:', 'https:'].includes(url.protocol) && url.origin !== origin) {
+        externalRequests.push(url.href);
+        await route.abort();
+        return;
+      }
+
+      await route.continue();
+    });
+
+              page.on('requestfailed', request => {
+      const url = new URL(request.url());
+
+      if (!url.pathname.startsWith('/api/')) {
+        assetFailures.push(request.url());
+      }
+    });
+
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', req => { if (new URL(req.url()).pathname.startsWith('/api/')) apiRequests.push(req.url()); });
     page.on('dialog', dialog => dialog.accept());
     await page.goto(`http://127.0.0.1:${port}/host-monitor/`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.monitor-card');
+    assert.ok(cssResponse, 'local CSS file must be requested');
+    assert.equal(cssResponse.status, 200, 'local CSS must return HTTP 200');
+    assert.match(cssResponse.contentType, /text\/css/i, 'local CSS must have text/css content type');
+    assert.deepEqual(externalRequests, [], 'demo must not request external HTTP(S) assets');
+    assert.deepEqual(assetFailures, [], 'local assets must not fail to load');
+
+    const bodyFont = await page.locator('body').evaluate(element =>
+      getComputedStyle(element).fontFamily
+    );
+    assert.ok(bodyFont.length > 0, 'page must have a computed font');
     assert.equal(await page.locator('.monitor-card').count(), 8);
     assert.ok(await page.locator('#demo-banner').isVisible());
     await page.evaluate(() => setFilter('down'));

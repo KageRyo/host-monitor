@@ -31,6 +31,8 @@ jobs:
         run: node --check server.js
       - name: Build static demo
         run: npm run build:demo
+      - name: Check generated CSS is up to date
+        run: git diff --exit-code -- public/styles.css
       - name: Verify browser interactions
         run: npm run test:browser
       - name: Upload frontend assets only
