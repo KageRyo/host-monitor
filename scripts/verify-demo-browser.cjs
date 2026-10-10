@@ -42,7 +42,7 @@ const server = http.createServer((req, res) => {
     let cssResponse = null;
 
     // Use a dedicated browser context so the offline checks cannot inherit state.
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: 'light' });
     const page = await context.newPage();
 
     // Register listeners before navigation so the first asset requests are observed.
@@ -117,7 +117,13 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator('.monitor-card').count(), 2);
     await page.evaluate(() => setFilter('all'));
     await page.evaluate(() => toggleTheme());
-    assert.ok(await page.evaluate(() => ['dark', 'light'].includes(localStorage.getItem('theme'))));
+    assert.equal(await page.evaluate(() => localStorage.getItem('theme')), 'dark');
+    assert.ok(await page.evaluate(() => document.documentElement.classList.contains('dark')));
+    // Card colors transition for 0.2s; wait for the rendered dark color.
+    await page.waitForFunction(() =>
+      getComputedStyle(document.querySelector('.monitor-card')).backgroundColor === 'rgb(15, 23, 42)',
+      null, { timeout: 5000 }
+    );
     assert.equal(await firstCard.evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(15, 23, 42)', 'dark theme monitor cards must have a slate background');
     await page.evaluate(() => showAddModal());
     await page.fill('#form-ip', '198.51.100.7');
