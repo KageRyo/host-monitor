@@ -14,5 +14,6 @@ fs.writeFileSync(path.join(output, 'index.html'), html);
 fs.copyFileSync(path.join(root, 'public/demo.js'), path.join(output, 'demo.js'));
 fs.copyFileSync(path.join(root, 'public/api.js'), path.join(output, 'api.js'));
 fs.copyFileSync(path.join(root, 'public/shared.js'), path.join(output, 'shared.js'));
+fs.copyFileSync(path.join(root, 'public/styles.css'), path.join(output, 'styles.css'));
 fs.writeFileSync(path.join(output, '.nojekyll'), '');
 console.log('Static demo built in demo-dist/');

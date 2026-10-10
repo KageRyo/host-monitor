@@ -23,6 +23,7 @@
 | 整理與篩選 | 自訂類別順序、只看上線或離線主機 |
 | 外觀 | 明暗主題，目前介面為正體中文 |
 | 儲存 | 本地 JSON，無需資料庫服務 |
+| 離線前端 | 本地生成的 CSS、inline SVG 圖示與系統字型；執行時無需外部 CSS、圖示或字型 CDN |
 
 可用率依累計檢查的成功比例計算；尚未檢查的主機顯示 `—`，全域平均排除這些主機，全部未檢查時也顯示 `—`。每台主機另外保留最近 60 筆歷史。ping 成功表示網路可達，不代表 HTTP 服務或應用程式正常。
 
@@ -130,11 +131,14 @@ pm2 startup
 
 靜態 demo 沿用現有儀表板，提供八台虛構主機、上線／離線狀態與每 30 秒一次的模擬檢查。可以新增、編輯、刪除主機、手動檢查、排序類別、篩選狀態與切換主題。**不會連線到輸入的位址**，頁面上方有明確的模擬資料提示。
 
-變更以獨立的 localStorage key 保存在訪客瀏覽器，按「重設 Demo」可還原範例。停用瀏覽器儲存時仍可操作，但重新整理會重設。樣式、圖示與字型仍透過外部 CDN 載入。
+變更以獨立的 localStorage key 保存在訪客瀏覽器，按「重設 Demo」可還原範例。停用瀏覽器儲存時仍可操作，但重新整理會重設。
 
-不需安裝後端依賴即可建置與預覽：
+樣式使用本地生成的 Tailwind CSS，圖示使用 inline SVG，字型使用系統字型。Demo 執行時不需要外部 CSS、圖示或字型 CDN。
+
+在本機建置與預覽 Demo：
 
 ```bash
+npm install
 npm run build:demo
 python3 -m http.server 8080 --directory demo-dist
 ```
@@ -153,13 +157,34 @@ python3 -m http.server 8080 --directory demo-dist
 
 ## 開發
 
-後端使用 Express 5 與 `ping` 套件；前端為 Vanilla JavaScript、Tailwind CSS 與 Font Awesome。樣式、圖示與字型目前透過外部 CDN 載入。
+後端使用 Express 5 與 `ping` 套件；前端使用 Vanilla JavaScript 與 Tailwind CSS，搭配本地生成的 CSS、inline SVG 圖示與系統字型。執行時不需要外部 CSS、圖示或字型 CDN。
+
+安裝開發依賴：
 
 ```bash
 npm install
+```
+
+修改前端樣式後，重新生成樣式表：
+
+```bash
+npm run build:css
+```
+
+Demo 建置會先執行 CSS 建置，再將所需前端資產複製到 `demo-dist/`：
+
+```bash
+npm run build:demo
+```
+
+執行測試並啟動開發伺服器：
+
+```bash
 npm test
 node --check server.js
 npm start
+npm run build:css
+npm run build:demo
 ```
 
 `npm test` 使用 Node.js 內建測試工具，分開驗證正式後端、demo、設定、排程、Linux 腳本與 webhook。後端資料寫入臨時目錄，ping 使用 mock，通知使用本機 HTTP receiver，不需真實 ICMP 或外部服務。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
