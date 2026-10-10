@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "build:demo": "node scripts/build-demo.js",
+    "build:css": "tailwindcss -c tailwind.config.js -i src/input.css -o public/styles.css --minify",
+    "build:demo": "npm run build:css && node scripts/build-demo.js",
     "test:browser": "npm run build:demo && node scripts/verify-demo-browser.cjs",
     "browser:install": "playwright install chromium"
   },
@@ -29,6 +30,7 @@
     "ping": "^0.4.4"
   },
   "devDependencies": {
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "tailwindcss": "^3.4.17"
   }
 }

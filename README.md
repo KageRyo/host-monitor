@@ -5,8 +5,8 @@
 A lightweight, self-hosted dashboard for checking whether servers, NAS devices, printers, and other IPv4 hosts are reachable. Host Monitor runs ICMP ping checks from your server and displays status, response time, uptime, and recent check history in a browser.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs\&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-5-000000?logo=express\&logoColor=white)](https://expressjs.com/)
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#data-and-logs)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
@@ -15,14 +15,15 @@ A lightweight, self-hosted dashboard for checking whether servers, NAS devices, 
 
 ## At a glance
 
-| Feature | Behavior |
-| --- | --- |
-| Reachability checks | ICMP ping every 30 seconds by default, with manual checks for one or all hosts |
-| Dashboard | Grouped status cards, response times, uptime percentages, and heartbeat history |
-| Host management | Add, edit, and remove IPv4 targets with names, categories, and notes |
-| Organization | Custom category order and online/offline filters |
-| Appearance | Light and dark themes; the current interface uses Traditional Chinese |
-| Storage | Local JSON file; no database service required |
+| Feature             | Behavior                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Reachability checks | ICMP ping every 30 seconds by default, with manual checks for one or all hosts                                    |
+| Dashboard           | Grouped status cards, response times, uptime percentages, and heartbeat history                                   |
+| Host management     | Add, edit, and remove IPv4 targets with names, categories, and notes                                              |
+| Organization        | Custom category order and online/offline filters                                                                  |
+| Appearance          | Light and dark themes; the current interface uses Traditional Chinese                                             |
+| Storage             | Local JSON file; no database service required                                                                     |
+| Offline frontend    | Locally generated CSS, inline SVG icons, and system fonts; no external CSS, icon, or font CDN required at runtime |
 
 Uptime is the percentage of successful recorded checks. Each host retains its latest 60 history entries, while its cumulative check counters are stored separately. A successful ping indicates network reachability; it does not verify the health of an HTTP service or application.
 
@@ -69,19 +70,19 @@ Only IPv4 addresses are accepted by the dashboard API. Hostnames and IPv6 addres
 
 Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing process environment variables take precedence over values in `.env`.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PORT` | `3000` | HTTP listening port, 1–65535 |
-| `CHECK_INTERVAL` | `30000` | Automatic check interval, 1000–2147483647 milliseconds |
-| `LOG_MAX_BYTES` | `5242880` | Log rotation threshold in bytes (5 MiB) |
-| `LOG_MAX_FILES` | `5` | Number of rotated log backups; `0` discards the previous log on rotation |
-| `LOG_TO_STDOUT` | `true` in a terminal, otherwise `false` | Also print application logs to the console |
-| `PROBE_CONCURRENCY` | `5` | Shared automatic/manual ping concurrency limit |
-| `MAX_MONITORS` | `100` | Limit on new monitors; existing excess data remains monitored |
-| `MANUAL_CHECK_LIMIT` | `10` | Process-wide manual requests per 60 seconds, shared by both check endpoints |
-| `WEBHOOK_ENABLED` | `false` | Enable generic JSON webhook notifications |
-| `WEBHOOK_URL` | Empty | HTTP/HTTPS receiver URL |
-| `WEBHOOK_TIMEOUT_MS` | `5000` | Notification timeout, 1–2147483647 milliseconds |
+| Variable             | Default                                 | Purpose                                                                     |
+| -------------------- | --------------------------------------- | --------------------------------------------------------------------------- |
+| `PORT`               | `3000`                                  | HTTP listening port, 1–65535                                                |
+| `CHECK_INTERVAL`     | `30000`                                 | Automatic check interval, 1000–2147483647 milliseconds                      |
+| `LOG_MAX_BYTES`      | `5242880`                               | Log rotation threshold in bytes (5 MiB)                                     |
+| `LOG_MAX_FILES`      | `5`                                     | Number of rotated log backups; `0` discards the previous log on rotation    |
+| `LOG_TO_STDOUT`      | `true` in a terminal, otherwise `false` | Also print application logs to the console                                  |
+| `PROBE_CONCURRENCY`  | `5`                                     | Shared automatic/manual ping concurrency limit                              |
+| `MAX_MONITORS`       | `100`                                   | Limit on new monitors; existing excess data remains monitored               |
+| `MANUAL_CHECK_LIMIT` | `10`                                    | Process-wide manual requests per 60 seconds, shared by both check endpoints |
+| `WEBHOOK_ENABLED`    | `false`                                 | Enable generic JSON webhook notifications                                   |
+| `WEBHOOK_URL`        | Empty                                   | HTTP/HTTPS receiver URL                                                     |
+| `WEBHOOK_TIMEOUT_MS` | `5000`                                  | Notification timeout, 1–2147483647 milliseconds                             |
 
 Invalid integer settings fall back to defaults with a warning. Concurrency, monitor cap, and manual quota must be positive integers.
 
@@ -105,9 +106,9 @@ Delivery runs in the background with two workers and up to 100 waiting events. Q
 
 ## Data and logs
 
-- `data/monitors.json` stores targets, notes, category order, cumulative check counters, and recent history.
-- `logs/monitor.log` stores application logs, with rotated backups named `monitor.log.1` through `monitor.log.5` by default.
-- `logs/startup.log` captures startup output when using `start.sh`.
+* `data/monitors.json` stores targets, notes, category order, cumulative check counters, and recent history.
+* `logs/monitor.log` stores application logs, with rotated backups named `monitor.log.1` through `monitor.log.5` by default.
+* `logs/startup.log` captures startup output when using `start.sh`.
 
 Both `data/` and `logs/`, along with local environment files, are ignored by Git. Back up `data/monitors.json` if you need to preserve your configuration and counters. With the default check interval, 60 history entries cover approximately 30 minutes.
 
@@ -138,11 +139,14 @@ Follow the command printed by `pm2 startup` to configure startup on your system.
 
 The static demo reuses the dashboard with eight synthetic hosts, mixed online/offline states, and simulated checks every 30 seconds. You can add, edit, and delete hosts, run manual checks, reorder categories, filter statuses, and switch themes. **No entered address is contacted.** A visible banner distinguishes the demo from a real monitoring deployment.
 
-Demo changes are saved in the visitor's browser using a separate localStorage key. **重設 Demo** (Reset demo) restores the sample hosts. If browser storage is unavailable, the demo works in memory and resets on reload. Styling, icons, and fonts still load from external CDNs.
+Demo changes are saved in the visitor's browser using a separate localStorage key. **重設 Demo** (Reset demo) restores the sample hosts. If browser storage is unavailable, the demo works in memory and resets on reload.
 
-Build and preview without installing backend dependencies:
+Styling is generated locally with Tailwind CSS, icons use inline SVGs, and fonts use the system font stack. The demo does not require external CSS, icon, or font CDNs at runtime.
+
+Build and preview the demo locally:
 
 ```bash
+npm install
 npm run build:demo
 python3 -m http.server 8080 --directory demo-dist
 ```
@@ -161,10 +165,29 @@ The URL becomes available after Pages is enabled and the first deployment succee
 
 ## Development
 
-The backend uses Express 5 and the `ping` package. The dashboard uses vanilla JavaScript, Tailwind CSS, and Font Awesome. Frontend styling, icons, and fonts currently load from external CDNs.
+The backend uses Express 5 and the `ping` package. The dashboard uses vanilla JavaScript and Tailwind CSS, with locally generated CSS, inline SVG icons, and system fonts. No external CSS, icon, or font CDN is required at runtime.
+
+Install the development dependencies:
 
 ```bash
 npm install
+```
+
+To regenerate the stylesheet after changing frontend styles, run:
+
+```bash
+npm run build:css
+```
+
+The demo build runs this CSS build automatically and copies the required frontend assets into `demo-dist/`:
+
+```bash
+npm run build:demo
+```
+
+Run the tests and start the server during development:
+
+```bash
 npm test
 node --check server.js
 npm start

@@ -20,6 +20,7 @@ for (const [prefix, folder] of [['/host-monitor/', 'demo-dist'], ['/', 'public']
   assets.set(`${prefix}index.html`, { type: 'text/html', body: html });
   assets.set(`${prefix}demo.js`, { type: 'text/javascript', body: js });
   assets.set(`${prefix}shared.js`, { type: 'text/javascript', body: fs.readFileSync(path.join(root, folder, 'shared.js')) });
+  assets.set(`${prefix}styles.css`, { type: 'text/css', body: fs.readFileSync(path.join(root, folder, 'styles.css')) });
 }
 const server = http.createServer((req, res) => {
   const asset = assets.get(new URL(req.url, 'http://localhost').pathname);
