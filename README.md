@@ -73,6 +73,7 @@ Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing 
 | Variable             | Default                                 | Purpose                                                                     |
 | -------------------- | --------------------------------------- | --------------------------------------------------------------------------- |
 | `PORT`               | `3000`                                  | HTTP listening port, 1–65535                                                |
+| `HOST`               | `0.0.0.0`                               | IPv4 bind address; invalid values stop startup                             |
 | `CHECK_INTERVAL`     | `30000`                                 | Automatic check interval, 1000–2147483647 milliseconds                      |
 | `LOG_MAX_BYTES`      | `5242880`                               | Log rotation threshold in bytes (5 MiB)                                     |
 | `LOG_MAX_FILES`      | `5`                                     | Number of rotated log backups; `0` discards the previous log on rotation    |
@@ -120,7 +121,7 @@ tail -f logs/monitor.log
 
 ## Deployment
 
-Run Host Monitor on a machine that can reach the devices you want to check. The HTTP server listens on `0.0.0.0`, so it is accessible through the host's network interfaces when the firewall permits it.
+Run Host Monitor on a machine that can reach the devices you want to check. `HOST=0.0.0.0` remains the default for existing LAN installations and listens on all IPv4 interfaces when the firewall permits it. Set `HOST=127.0.0.1` behind a local reverse proxy to restrict the listener to loopback, or set a specific local IPv4 address. Hostnames and IPv6 bind addresses are not supported; invalid values stop startup rather than falling back to a wider binding. Startup URLs reflect the selected address; loopback mode does not advertise LAN URLs. Binding restricts network exposure but does not authenticate callers.
 
 The current application has no built-in authentication. These limits protect one process and do not replace authentication. Use it on a trusted network, or place it behind an authenticated reverse proxy when remote access is needed.
 

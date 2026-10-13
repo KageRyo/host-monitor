@@ -4,6 +4,17 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+test('bind address preserves LAN default and rejects invalid values without widening exposure', () => {
+  const { readConfig } = require('../config');
+  assert.equal(readConfig({}).host, '0.0.0.0');
+  for (const host of ['0.0.0.0', '127.0.0.1', '192.0.2.5']) {
+    assert.equal(readConfig({ HOST: ` ${host} ` }).host, host);
+  }
+  for (const host of ['', 'localhost', '::1', '127.0.0.999', 'https://127.0.0.1']) {
+    assert.throws(() => readConfig({ HOST: host }), /Invalid HOST/);
+  }
+});
+
 test('invalid ports and timer intervals fall back safely with warnings', () => {
   const { readConfig } = require('../config');
   for (const invalid of ['abc', '0', '-1', '1.5', '2x', '65536', '999999999999999999']) {

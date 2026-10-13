@@ -120,22 +120,28 @@ const config = readConfig();
 const PORT = config.port;
 const CHECK_INTERVAL = config.checkInterval;
 const backend = createApp({ config });
-backend.startChecker();
-
-backend.app.listen(PORT, '0.0.0.0', () => {
-  const ips = getLocalIPs();
+const server = backend.app.listen(PORT, config.host, () => {
+  backend.startChecker();
+  const ips = config.host === '0.0.0.0' ? getLocalIPs() : [];
 
   console.log(`\n✅ 主機監測系統已啟動`);
-  console.log(`   本機瀏覽：  http://localhost:${PORT}`);
+  const localHost = config.host === '0.0.0.0' ? '127.0.0.1' : config.host;
+  console.log(`   監聽位址：  ${config.host}:${PORT}`);
+  console.log(`   瀏覽網址：  http://${localHost}:${PORT}`);
 
   if (ips.length > 0) {
     console.log(`   區域網路：`);
     ips.forEach(ip => {
       console.log(`                 http://${ip}:${PORT}`);
     });
-  } else {
+  } else if (config.host === '0.0.0.0') {
     console.log(`   區域網路：  http://<本機IP>:${PORT}`);
   }
 
   console.log(`   自動檢查間隔：${CHECK_INTERVAL / 1000} 秒\n`);
+});
+server.on('error', err => {
+  console.error(`HTTP listener failed (${err.code || 'unknown'}); check HOST and PORT`);
+  backend.close();
+  process.exitCode = 1;
 });
