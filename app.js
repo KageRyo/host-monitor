@@ -1,11 +1,11 @@
 const express = require('express');
-const ping = require('ping');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const { createNotifier } = require('./notifications');
 const { readConfig } = require('./config');
 const { createBasicAuth } = require('./auth');
+const { createSystemProbe, executionError, normalizeProbeResult } = require('./probes');
 const { createProbeScheduler, createManualLimiter } = require('./scheduler');
 const { groupKey, groupLabel, averageUptime } = require('./public/shared');
 
@@ -25,41 +25,27 @@ function dataWriteError() {
   };
 }
 
-async function realProbe(ip) {
-  try {
-    const res = await ping.promise.probe(ip, {
-      timeout: 3,
-      min_reply: 1,
-      numeric: true
-    });
-    const alive = !!res.alive;
-    let rtt = null;
-    if (alive) {
-      const t = res.time;
-      if (typeof t === 'number') rtt = Math.round(t);
-      else if (typeof t === 'string' && t !== 'unknown') rtt = Math.round(Number.parseFloat(t));
-    }
-    return { alive, rtt };
-  } catch {
-    // A failed ping is a down result; raw probe errors do not change the API response.
-    return { alive: false, rtt: null };
-  }
-}
+const realProbe = createSystemProbe();
 
 function updateMonitor(monitor, result) {
   const now = new Date();
 
-  monitor.status = result.alive ? 'up' : 'down';
+  monitor.status = result.error ? 'error' : result.alive ? 'up' : 'down';
+  monitor.checkError = result.error || null;
   monitor.responseTime = result.rtt;
   monitor.lastCheck = now.toISOString();
 
-  monitor.totalChecks = (monitor.totalChecks || 0) + 1;
-  if (result.alive) monitor.upChecks = (monitor.upChecks || 0) + 1;
+  if (!result.error) {
+    monitor.lastReachabilityStatus = monitor.status;
+    monitor.totalChecks = (monitor.totalChecks || 0) + 1;
+    if (result.alive) monitor.upChecks = (monitor.upChecks || 0) + 1;
+  }
 
   monitor.history.push({
     time: now.toISOString(),
     alive: result.alive,
-    rtt: result.rtt
+    rtt: result.rtt,
+    ...(result.error ? { error: result.error } : {})
   });
   if (monitor.history.length > 60) {
     monitor.history.shift();
@@ -119,6 +105,8 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
             name: m.name || m.ip,
             group: groupKey(m.group),
             status: m.status || 'unknown',
+            checkError: m.checkError || null,
+            lastReachabilityStatus: m.lastReachabilityStatus || (['up', 'down'].includes(m.status) ? m.status : 'unknown'),
             responseTime: m.responseTime ?? null,
             lastCheck: m.lastCheck || null,
             history: Array.isArray(m.history) ? m.history.slice(-60) : [],
@@ -178,16 +166,17 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   const scheduler = createProbeScheduler({ concurrency: config.probeConcurrency, run: async monitor => {
     if (!monitors.includes(monitor)) return true;
     let result;
-    try { result = await probe(monitor.ip); }
-    catch { result = { alive: false, rtt: null }; }
+    try { result = normalizeProbeResult(await probe(monitor.ip)); }
+    catch { result = executionError(); }
     if (!monitors.includes(monitor)) return true;
     const previous = { ...monitor, history: monitor.history.slice() };
-    const previousStatus = monitor.status;
+    const previousStatus = monitor.lastReachabilityStatus || (['up', 'down'].includes(monitor.status) ? monitor.status : 'unknown');
     updateMonitor(monitor, result);
+    if (result.error) logger.warn('Probe execution failed; check ping installation, permissions, and monitoring-node configuration');
     const saved = saveToFile();
     if (!saved) Object.assign(monitor, previous);
     const initialDown = config.webhookInitialDown && previousStatus === 'unknown' && monitor.status === 'down';
-    const changedReachability = ['up', 'down'].includes(previousStatus) && previousStatus !== monitor.status;
+    const changedReachability = !result.error && ['up', 'down'].includes(previousStatus) && previousStatus !== monitor.status;
     if (saved && (initialDown || changedReachability)) {
       notifier.notify({ event: 'monitor.status_changed',
         monitor: { id: monitor.id, ip: monitor.ip, name: monitor.name, group: monitor.group },
@@ -300,13 +289,15 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     const total = monitors.length;
     const up = monitors.filter(m => m.status === 'up').length;
     const down = monitors.filter(m => m.status === 'down').length;
-    const unknown = total - up - down;
+    const error = monitors.filter(m => m.status === 'error').length;
+    const unknown = total - up - down - error;
 
 
     return {
       total,
       up,
       down,
+      error,
       unknown,
       avgUptime: averageUptime(monitors),
       lastGlobalCheck
@@ -364,6 +355,8 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
       name: name?.trim() ? name.trim() : cleanIp,
       group: groupKey(group),
       status: 'unknown',
+      checkError: null,
+      lastReachabilityStatus: 'unknown',
       responseTime: null,
       lastCheck: null,
       history: [],

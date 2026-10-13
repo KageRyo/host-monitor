@@ -4,6 +4,39 @@ const http = require('node:http');
 const fs = require('node:fs');
 const { setup } = require('./helpers');
 
+for (const initial of [false, true]) {
+  test(`probe errors do not alert and confirmed transitions survive errors (${initial ? 'initial' : 'established'})`, async t => {
+    const events = [];
+    const url = await receiver(t, (req, res) => {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => { events.push(JSON.parse(body)); res.end(); });
+    });
+    let fail = initial, alive = true;
+    const { request, dataFile } = await setup(t, { config: { webhookEnabled: true, webhookUrl: url, webhookInitialDown: true },
+      probe: async () => { if (fail) throw new Error('execution failed'); return { alive, rtt: null }; } });
+    await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+    if (!initial) await request('/api/monitors/192-0-2-1/check', 'POST');
+    fail = true;
+    await request('/api/monitors/192-0-2-1/check', 'POST');
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(events.length, 0);
+    const reloaded = await setup(t, { dataFile, config: { webhookEnabled: true, webhookUrl: url, webhookInitialDown: true },
+      probe: async () => ({ alive: false, rtt: null }) });
+    await reloaded.request('/api/monitors/192-0-2-1/check', 'POST');
+    await waitFor(() => events.length === 1);
+    assert.deepEqual([events[0].previousStatus, events[0].status], [initial ? 'unknown' : 'up', 'down']);
+    await reloaded.request('/api/monitors/192-0-2-1/check', 'POST');
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(events.length, 1);
+    const recovered = await setup(t, { dataFile, config: { webhookEnabled: true, webhookUrl: url },
+      probe: async () => ({ alive: true, rtt: 1 }) });
+    await recovered.request('/api/monitors/192-0-2-1/check', 'POST');
+    await waitFor(() => events.length === 2);
+    assert.deepEqual([events[1].previousStatus, events[1].status], ['down', 'up']);
+  });
+}
+
 for (const enabled of [false, true]) {
   test(`initial-down policy ${enabled ? 'enabled' : 'disabled'} emits once and preserves recovery`, async t => {
     const events = [];

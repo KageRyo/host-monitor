@@ -133,8 +133,10 @@ test('all checks have bounded concurrency and rejected probes do not retain lock
   const result = await request('/api/check-all', 'POST');
   assert.equal(result.status, 200);
   assert.equal(peak, 2);
-  assert.ok(result.body.monitors.every(m => m.totalChecks === 1));
-  assert.equal(result.body.monitors.find(m => m.ip === '192.0.2.1').status, 'down');
+  assert.ok(result.body.monitors.filter(m => m.ip !== '192.0.2.1').every(m => m.totalChecks === 1));
+  const failed = result.body.monitors.find(m => m.ip === '192.0.2.1');
+  assert.equal(failed.status, 'error');
+  assert.equal(failed.totalChecks, 0);
   assert.equal((await request('/api/monitors/192-0-2-1/check', 'POST')).status, 200);
 });
 

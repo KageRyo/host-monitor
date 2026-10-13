@@ -97,6 +97,8 @@ cp monitors.example.json data/monitors.json
 
 ## Webhook 通知
 
+檢查區分 `up`、`down`、`unknown`（尚未測量）與 `error`（測量執行失敗）。缺少 ping 工具、權限不足、非預期例外、不支援或無法解析的輸出、異常結束碼與 5 秒程序期限都記為 `error`，不當作離線；有效的無回覆／100% 封包遺失結果仍為 `down`。API 提供 `checkError: "probe_execution_failed"` 與 `stats.error`；dashboard 提示檢查監測主機的 ping 與權限，不公開原始程序輸出。錯誤歷史使用 `alive: null`、`rtt: null` 與相同錯誤碼，保留在最近 60 筆歷史中，但不增加 `totalChecks`、`upChecks`，可用率只計算有效結果（尚無有效結果時為 `null`）。錯誤不觸發 webhook；最後確認的可達狀態另外保存，因此錯誤或重啟後首次確認的狀態變化仍能通知。儲存失敗會回復所有先前狀態。
+
 設定 `WEBHOOK_ENABLED=true` 與 `WEBHOOK_URL`，重新啟動後啟用。結果成功儲存後，在 `up→down`、`down→up` 發送通知；首次未知狀態預設不通知。設定 `WEBHOOK_INITIAL_DOWN=true` 可在首次檢查成功儲存為 down 時發送一次 `unknown→down` 通知，門檻為一次已確認的檢查。沿用 `monitor.status_changed` 事件，payload 使用 `previousStatus: "unknown"` 與 `status: "down"`。首次 up、持續 down、儲存失敗與 demo 均不通知；已儲存的狀態會防止重啟後重複首次警報。HTTP／HTTPS 接收端收到以下 JSON：
 
 ```json
