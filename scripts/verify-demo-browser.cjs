@@ -157,6 +157,13 @@ const server = http.createServer((req, res) => {
     await page.evaluate(() => toggleReorderMode());
     const oldFirst = await page.locator('#groups-container > div').first().getAttribute('data-internal-group');
     await page.evaluate(key => moveGroupByInternal(key, 1), oldFirst);
+    const movedOrder = await page.locator('#groups-container > div').evaluateAll(nodes => nodes.map(node => node.dataset.internalGroup));
+    assert.notEqual(movedOrder[0], oldFirst);
+    await page.evaluate(() => toggleReorderMode());
+    assert.deepEqual(await page.locator('#groups-container > div').evaluateAll(nodes => nodes.map(node => node.dataset.internalGroup)), movedOrder, 'exiting reorder mode preserves saved order immediately');
+    await page.evaluate(() => toggleReorderMode());
+    await page.evaluate(() => refreshUI(true));
+    assert.deepEqual(await page.locator('#groups-container > div').evaluateAll(nodes => nodes.map(node => node.dataset.internalGroup)), movedOrder, 'polling preserves the active category order');
     await page.evaluate(() => toggleReorderMode());
     await page.reload({ waitUntil: 'networkidle' });
     assert.notEqual(await page.locator('#groups-container > div').first().getAttribute('data-internal-group'), oldFirst);
@@ -258,6 +265,72 @@ const server = http.createServer((req, res) => {
     live.on('dialog', dialog => dialog.accept());
     live.on('pageerror', error => errors.push(error.message));
     await live.goto(liveOrigin + '/', { waitUntil: 'networkidle' });
+    // Check category reordering against persisted real API state, including in-flight polling.
+    for (const [ip, group] of [['192.0.2.31', 'server'], ['192.0.2.32', 'nas'], ['192.0.2.33', 'edge']]) {
+      await live.evaluate(async ({ ip, group }) => {
+        await apiRequest('/api/monitors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip, group }) });
+      }, { ip, group });
+    }
+    await live.evaluate(() => refreshUI(true));
+    await live.evaluate(() => toggleReorderMode());
+    const groupKeys = () => live.locator('#groups-container > div').evaluateAll(nodes => nodes.map(node => node.dataset.internalGroup));
+    const beforeOrder = await groupKeys();
+    const afterOrder = [beforeOrder[1], beforeOrder[0], beforeOrder[2]];
+    let releasePoll, pollReached, delayPoll = true;
+    const pollGate = new Promise(resolve => { releasePoll = resolve; });
+    const pollStarted = new Promise(resolve => { pollReached = resolve; });
+    await live.route('**/api/monitors', async route => {
+      if (!delayPoll || route.request().method() !== 'GET') return route.continue();
+      delayPoll = false;
+      const response = await route.fetch();
+      pollReached();
+      await pollGate;
+      await route.fulfill({ response });
+    });
+    await live.evaluate(() => { window.pendingPoll = refreshUI(true); });
+    await pollStarted;
+    let releaseSave, saveReached;
+    const saveGate = new Promise(resolve => { releaseSave = resolve; });
+    const saveStarted = new Promise(resolve => { saveReached = resolve; });
+    await live.route('**/api/groups/order', async route => {
+      if (route.request().method() !== 'PUT') return route.continue();
+      saveReached();
+      await saveGate;
+      await route.continue();
+    });
+    await live.evaluate(key => { window.pendingMove = moveGroupByInternal(key, 1); }, beforeOrder[0]);
+    await saveStarted;
+    assert.deepEqual(await groupKeys(), afterOrder, 'move updates category order before save finishes');
+    assert.equal(await live.locator('#reorder-btn').isDisabled(), true, 'save disables conflicting mode changes');
+    await live.evaluate(key => { moveGroupByInternal(key, 1); }, afterOrder[0]);
+    assert.deepEqual(await groupKeys(), afterOrder, 'pending save prevents overlapping moves');
+    await live.evaluate(() => refreshUI(true));
+    assert.deepEqual(await groupKeys(), afterOrder, 'polling during save must not overwrite edited order');
+    releaseSave();
+    await live.evaluate(() => window.pendingMove);
+    await live.unroute('**/api/groups/order');
+    await live.evaluate(() => toggleReorderMode());
+    assert.deepEqual(await groupKeys(), afterOrder, 'mode exit keeps saved order');
+    releasePoll();
+    await live.evaluate(() => window.pendingPoll);
+    await live.unroute('**/api/monitors');
+    assert.deepEqual(await groupKeys(), afterOrder, 'an older delayed poll cannot revert saved order after mode exit');
+    assert.equal(await live.locator('#reorder-btn').isDisabled(), false);
+    await live.reload({ waitUntil: 'networkidle' });
+    assert.deepEqual(await groupKeys(), afterOrder, 'real saved order survives reload');
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(liveDir, 'monitors.json'))).groupOrder, afterOrder);
+    await live.evaluate(() => toggleReorderMode());
+    await live.route('**/api/groups/order', route => route.fulfill({ status: 500, json: { error: 'Order persistence failed' } }));
+    await live.evaluate(key => moveGroupByInternal(key, 1), afterOrder[0]);
+    assert.deepEqual(await groupKeys(), afterOrder, 'failed save restores persisted order');
+    assert.equal(await live.locator('#toast-text').innerText(), 'Order persistence failed');
+    await live.unroute('**/api/groups/order');
+    await live.evaluate(() => toggleReorderMode());
+    assert.deepEqual(await groupKeys(), afterOrder, 'failed order stays restored on mode exit');
+    await live.evaluate(async () => {
+      for (const monitor of currentMonitors) await apiRequest(`/api/monitors/${monitor.id}`, { method: 'DELETE' });
+      await refreshUI(true);
+    });
     await live.evaluate(() => showAddModal());
     await live.fill('#form-ip', '192.0.2.8');
     await live.fill('#form-name', 'Real route test');
