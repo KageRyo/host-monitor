@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const net = require('node:net');
 
 function loadEnvFile(file = path.join(__dirname, '.env'), env = process.env, logger = console) {
   if (!fs.existsSync(file)) return;
@@ -35,7 +36,10 @@ function readBooleanEnv(name, defaultValue, env = process.env) {
 }
 function readConfig(env = process.env, logger = console) {
   const integer = (name, fallback, min, max) => readIntegerEnv(name, fallback, min, max, env, logger);
+  const host = env.HOST === undefined ? '0.0.0.0' : env.HOST.trim();
+  if (!net.isIPv4(host)) throw new Error('Invalid HOST; expected an IPv4 bind address');
   return {
+    host,
     port: integer('PORT', 3000, 1, 65535),
     checkInterval: integer('CHECK_INTERVAL', 30000, 1000, 2147483647),
     probeConcurrency: integer('PROBE_CONCURRENCY', 5, 1),
