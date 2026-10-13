@@ -5,6 +5,7 @@ const path = require('node:path');
 const net = require('node:net');
 const { createNotifier } = require('./notifications');
 const { readConfig } = require('./config');
+const { createBasicAuth } = require('./auth');
 const { createProbeScheduler, createManualLimiter } = require('./scheduler');
 const { groupKey, groupLabel, averageUptime } = require('./public/shared');
 
@@ -74,6 +75,7 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   const probe = injectedProbe || realProbe;
   const app = express();
   app.disable('x-powered-by');
+  app.use(createBasicAuth(config));
   const DATA_FILE = dataFile;
   const CHECK_INTERVAL = config.checkInterval || 30000;
 

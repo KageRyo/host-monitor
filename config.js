@@ -38,8 +38,20 @@ function readConfig(env = process.env, logger = console) {
   const integer = (name, fallback, min, max) => readIntegerEnv(name, fallback, min, max, env, logger);
   const host = env.HOST === undefined ? '0.0.0.0' : env.HOST.trim();
   if (!net.isIPv4(host)) throw new Error('Invalid HOST; expected an IPv4 bind address');
+  if (env.AUTH_ENABLED !== undefined && !['1', 'true', 'yes', 'on', '0', 'false', 'no', 'off'].includes(env.AUTH_ENABLED.trim().toLowerCase())) {
+    throw new Error('Invalid AUTH_ENABLED; expected a boolean');
+  }
+  const authEnabled = readBooleanEnv('AUTH_ENABLED', false, env);
+  const authUsername = env.AUTH_USERNAME || '';
+  const authPassword = env.AUTH_PASSWORD || '';
+  if (authEnabled && (!authUsername.trim() || /[:\x00-\x1f\x7f]/.test(authUsername) || !authPassword || /[\x00-\x1f\x7f]/.test(authPassword))) {
+    throw new Error('AUTH_ENABLED requires a valid AUTH_USERNAME and nonempty AUTH_PASSWORD');
+  }
   return {
     host,
+    authEnabled,
+    authUsername,
+    authPassword,
     port: integer('PORT', 3000, 1, 65535),
     checkInterval: integer('CHECK_INTERVAL', 30000, 1000, 2147483647),
     probeConcurrency: integer('PROBE_CONCURRENCY', 5, 1),

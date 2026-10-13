@@ -8,7 +8,8 @@ const os = require('node:os');
 const { createApp } = require('../app');
 const liveDir = fs.mkdtempSync(path.join(os.tmpdir(), 'host-monitor-browser-'));
 const backend = createApp({ dataFile: path.join(liveDir, 'monitors.json'),
-  probe: async () => ({ alive: true, rtt: 7 }), logger: { log() {}, warn() {}, error() {} } });
+  probe: async () => ({ alive: true, rtt: 7 }), logger: { log() {}, warn() {}, error() {} },
+  config: { authEnabled: true, authUsername: 'browser-test', authPassword: 'browser-test-password' } });
 let liveServer;
 // Serve a fixed asset allowlist. Request paths never become filesystem paths.
 const assets = new Map();
@@ -246,10 +247,13 @@ const server = http.createServer((req, res) => {
     // Browser → actual Express routes → isolated JSON file, with a mocked ICMP boundary.
     liveServer = backend.app.listen(0, '127.0.0.1');
     await new Promise(resolve => liveServer.once('listening', resolve));
-    const live = await browser.newPage();
+    const liveOrigin = `http://127.0.0.1:${liveServer.address().port}`;
+    assert.equal((await fetch(liveOrigin + '/')).status, 401);
+    assert.equal((await fetch(liveOrigin + '/api/monitors')).status, 401);
+    const live = await browser.newPage({ httpCredentials: { username: 'browser-test', password: 'browser-test-password' } });
     live.on('dialog', dialog => dialog.accept());
     live.on('pageerror', error => errors.push(error.message));
-    await live.goto(`http://127.0.0.1:${liveServer.address().port}/`, { waitUntil: 'networkidle' });
+    await live.goto(liveOrigin + '/', { waitUntil: 'networkidle' });
     await live.evaluate(() => showAddModal());
     await live.fill('#form-ip', '192.0.2.8');
     await live.fill('#form-name', 'Real route test');

@@ -70,6 +70,9 @@ cp monitors.example.json data/monitors.json
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP 監聽連接埠，範圍 1–65535 |
 | `HOST` | `0.0.0.0` | IPv4 綁定位址，無效值會停止啟動 |
+| `AUTH_ENABLED` | `false` | 用 HTTP Basic 認證保護 dashboard、靜態資產及所有 API |
+| `AUTH_USERNAME` | 空白 | 啟用認證時必填，不能包含冒號 |
+| `AUTH_PASSWORD` | 空白 | 啟用認證時必須提供非空白密碼 |
 | `CHECK_INTERVAL` | `30000` | 自動檢查間隔，1000–2147483647 毫秒 |
 | `LOG_MAX_BYTES` | `5242880` | 日誌輪替門檻，單位為 bytes（5 MiB） |
 | `LOG_MAX_FILES` | `5` | 保留的備份數；設為 `0` 時輪替會丟棄舊日誌 |
@@ -115,7 +118,32 @@ tail -f logs/monitor.log
 
 ## 部署
 
-部署主機必須能連到監測目標。為相容既有區域網路部署，預設 `HOST=0.0.0.0` 監聽所有 IPv4 介面，防火牆允許時可存取。使用本機反向代理時，設定 `HOST=127.0.0.1` 可只監聽 loopback，也可指定本機特定 IPv4 位址。不支援主機名稱或 IPv6；無效值會停止啟動，不會改用更廣的綁定範圍。啟動網址符合實際綁定位址，loopback 模式不顯示區域網路網址。綁定位址限制網路暴露範圍，不代表身分驗證。目前沒有內建登入驗證；上述限制只保護單一程序，適合可信任網路；需要遠端存取時，請放在有身分驗證的反向代理後方。
+部署主機必須能連到監測目標。為相容既有區域網路部署，預設 `HOST=0.0.0.0` 監聽所有 IPv4 介面，防火牆允許時可存取。使用本機反向代理時，設定 `HOST=127.0.0.1` 可只監聽 loopback，也可指定本機特定 IPv4 位址。不支援主機名稱或 IPv6；無效值會停止啟動，不會改用更廣的綁定範圍。啟動網址符合實際綁定位址，loopback 模式不顯示區域網路網址。綁定位址與請求配額不代表身分驗證；為相容既有部署，認證預設關閉。需要在可信任網路以外存取時，請啟用下述認證或使用有認證的 HTTPS 反向代理。
+
+## 選用身分驗證
+
+在不受版控的 `.env` 設定 `AUTH_ENABLED=true`、`AUTH_USERNAME` 及足夠強且不重複的 `AUTH_PASSWORD` 後重啟。缺少帳密、帳密含控制字元、帳號含冒號或 `AUTH_ENABLED` 無效時會停止啟動。瀏覽器使用原生登入提示，API 客戶端使用 `Authorization: Basic …` 標頭。dashboard、靜態資產與所有讀寫 API（包含 `/api/health`）皆須認證。網址參數不能用來傳入帳密，API 不回傳帳密，認證回應不快取；跨站瀏覽器寫入也會遭拒，避免瀏覽器自動附上的認證被濫用。
+
+Basic 認證只有編碼，沒有加密。遠端存取必須由反向代理提供 HTTPS，並設定 `HOST=127.0.0.1`；不要直接公開 3000 連接埠。例如以 Caddy 為自有網域管理憑證：
+
+```caddyfile
+monitor.example.com {
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+其他代理須保留原始 `Host` 標頭，讓同源操作正常通過。另一種方式是關閉內建認證，讓 HTTPS 代理認證**所有路徑**。例如 Caddy 的 `basic_auth`，搭配 `caddy hash-password` 產生的密碼雜湊：
+
+```caddyfile
+monitor.example.com {
+    basic_auth {
+        operator <generated-password-hash>
+    }
+    reverse_proxy 127.0.0.1:3000
+}
+```
+
+部署前請替換範例值；不要把明文密碼放進版控中的代理設定、網址或日誌。公開 GitHub Pages demo 刻意不使用認證，僅操作瀏覽器內的合成資料。內建 Basic 認證只有單一共用帳號，不提供角色、session 或登入暴力嘗試的速率限制；有需要時請搭配代理的存取控制與速率限制。
 
 長期執行可用 [PM2](https://pm2.keymetrics.io/) 直接管理 `server.js`：
 
