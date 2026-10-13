@@ -272,23 +272,13 @@ const server = http.createServer((req, res) => {
       }, { ip, group });
     }
     await live.evaluate(() => refreshUI(true));
+    await live.evaluate(() => setFilter('up'));
+    assert.equal(await live.locator('.monitor-card').count(), 0);
     await live.evaluate(() => toggleReorderMode());
+    assert.equal(await live.locator('#groups-container > div').count(), 3, 'reorder mode includes categories hidden by a filter');
     const groupKeys = () => live.locator('#groups-container > div').evaluateAll(nodes => nodes.map(node => node.dataset.internalGroup));
     const beforeOrder = await groupKeys();
     const afterOrder = [beforeOrder[1], beforeOrder[0], beforeOrder[2]];
-    let releasePoll, pollReached, delayPoll = true;
-    const pollGate = new Promise(resolve => { releasePoll = resolve; });
-    const pollStarted = new Promise(resolve => { pollReached = resolve; });
-    await live.route('**/api/monitors', async route => {
-      if (!delayPoll || route.request().method() !== 'GET') return route.continue();
-      delayPoll = false;
-      const response = await route.fetch();
-      pollReached();
-      await pollGate;
-      await route.fulfill({ response });
-    });
-    await live.evaluate(() => { window.pendingPoll = refreshUI(true); });
-    await pollStarted;
     let releaseSave, saveReached;
     const saveGate = new Promise(resolve => { releaseSave = resolve; });
     const saveStarted = new Promise(resolve => { saveReached = resolve; });
@@ -306,6 +296,20 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(await groupKeys(), afterOrder, 'pending save prevents overlapping moves');
     await live.evaluate(() => refreshUI(true));
     assert.deepEqual(await groupKeys(), afterOrder, 'polling during save must not overwrite edited order');
+    let releasePoll, pollReached;
+    const pollGate = new Promise(resolve => { releasePoll = resolve; });
+    const pollStarted = new Promise(resolve => { pollReached = resolve; });
+    await live.route('**/api/monitors', async route => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const response = await route.fetch();
+      pollReached();
+      await pollGate;
+      await route.fulfill({ response });
+    });
+    // This is the latest refresh, so the order revision (not stale-request filtering)
+    // must protect against its old server snapshot arriving after save and mode exit.
+    await live.evaluate(() => { window.pendingPoll = refreshUI(true); });
+    await pollStarted;
     releaseSave();
     await live.evaluate(() => window.pendingMove);
     await live.unroute('**/api/groups/order');
