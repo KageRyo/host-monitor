@@ -5,8 +5,11 @@
 A lightweight, self-hosted dashboard for checking whether servers, NAS devices, printers, and other IPv4 hosts are reachable. Host Monitor runs ICMP ping checks from your server and displays status, response time, uptime, and recent check history in a browser.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs\&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5-000000?logo=express\&logoColor=white)](https://expressjs.com/)
+[![Release](https://img.shields.io/github/v/release/KageRyo/host-monitor?display_name=tag)](https://github.com/KageRyo/host-monitor/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/demo-pages.yml?branch=main&label=CI)](https://github.com/KageRyo/host-monitor/actions/workflows/demo-pages.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=KageRyo_server-monitor&metric=alert_status)](https://sonarcloud.io/dashboard?id=KageRyo_server-monitor)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#data-and-logs)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
@@ -118,7 +121,7 @@ Set `WEBHOOK_ENABLED=true` and `WEBHOOK_URL`, then restart. After successfully p
 {"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}
 ```
 
-Delivery runs in the background with two workers and up to 100 waiting events. Queue overflow drops new events with a warning. Timeouts and HTTP failures do not block monitoring and are not retried; restarts discard waiting events. Invalid URLs disable notifications with a safe warning. URLs, tokens, and response bodies are never logged. This version has no failure threshold, cooldown, or durable redelivery. Discord/Slack require a bridge that accepts generic JSON.
+Delivery runs in the background with two workers and up to 100 waiting events. Queue overflow drops new events with a warning. Timeouts and HTTP failures do not block monitoring and are not retried; restarts discard waiting events. Invalid URLs disable notifications with a safe warning. URLs, tokens, and response bodies are never logged. The configurable failure threshold applies only to initial-down notifications; later confirmed transitions are immediate. There is no cooldown or durable redelivery. Discord/Slack require a bridge that accepts generic JSON.
 
 ## Data and logs
 
