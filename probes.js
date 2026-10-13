@@ -27,7 +27,10 @@ function createSystemProbe({ execute = promisify(execFile), platform = process.p
       output.stdout.split(/\r?\n/).forEach(line => parser.eat(line));
       const result = parser.getResult();
       // An unparseable result is not evidence that the target is down.
-      if (!result.alive && Number(result.packetLoss) !== 100) return executionError();
+      const packetLoss = Number(result.packetLoss);
+      const windowsUnreachable = builders.isWindow(platform) && Number.isFinite(packetLoss) &&
+        packetLoss >= 0 && packetLoss <= 100 && /\bDestination (?:host|net|network|port) unreachable\b/i.test(output.stdout);
+      if (!result.alive && packetLoss !== 100 && !windowsUnreachable) return executionError();
       const time = Number(result.time);
       return { alive: result.alive, rtt: result.alive && Number.isFinite(time) && time >= 0 ? Math.round(time) : null };
     } catch {

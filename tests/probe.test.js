@@ -3,6 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { setup } = require('./helpers');
 
+test('Windows explicit destination-unreachable replies remain down even when ping counts an ICMP error as received', async () => {
+  const { createSystemProbe } = require('../probes');
+  const stdout = 'Pinging 192.0.2.1 with 32 bytes of data:\r\nReply from 192.0.2.254: Destination host unreachable.\r\n\r\nPing statistics for 192.0.2.1:\r\n    Packets: Sent = 1, Received = 1, Lost = 0 (0% loss),\r\n';
+  const probe = createSystemProbe({ platform: 'win32', execute: async () => ({ stdout, stderr: '' }) });
+  assert.deepEqual(await probe('192.0.2.1'), { alive: false, rtt: null });
+});
+
 test('system probes distinguish valid no-reply summaries from execution and parsing failures', async () => {
   const { createSystemProbe } = require('../probes');
   const down = 'PING 192.0.2.1 (192.0.2.1) 56(84) bytes of data.\n\n--- 192.0.2.1 ping statistics ---\n1 packets transmitted, 0 received, 100% packet loss, time 0ms\n';
