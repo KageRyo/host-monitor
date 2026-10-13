@@ -2,10 +2,12 @@ const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const { randomUUID } = require('node:crypto');
 const { createNotifier } = require('./notifications');
 const { readConfig } = require('./config');
 const { createBasicAuth } = require('./auth');
 const { createSystemProbe, executionError, normalizeProbeResult } = require('./probes');
+const { validatePersistedState } = require('./persisted-state');
 const { createProbeScheduler, createManualLimiter } = require('./scheduler');
 const { groupKey, groupLabel, averageUptime } = require('./public/shared');
 
@@ -83,10 +85,10 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     if (!fs.existsSync(DATA_FILE)) return;
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFile = `${DATA_FILE}.corrupt-${stamp}`;
+    const backupFile = `${DATA_FILE}.corrupt-${stamp}-${randomUUID()}`;
 
     try {
-      fs.copyFileSync(DATA_FILE, backupFile);
+      fs.copyFileSync(DATA_FILE, backupFile, fs.constants.COPYFILE_EXCL);
       logger.error(`Corrupt data file copied to ${backupFile}`);
     } catch (e) {
       logger.error('Failed to copy corrupt data file:', e.message);
@@ -94,42 +96,33 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
   }
 
   function loadFromFile() {
+    let raw;
     try {
-      if (fs.existsSync(DATA_FILE)) {
-        const raw = fs.readFileSync(DATA_FILE, 'utf8');
-        const data = JSON.parse(raw);
-        if (Array.isArray(data.monitors)) {
-          monitors = data.monitors.map(m => ({
-            id: m.id || generateId(m.ip),
-            ip: m.ip,
-            name: m.name || m.ip,
-            group: groupKey(m.group),
-            status: m.status || 'unknown',
-            checkError: m.checkError || null,
-            lastReachabilityStatus: m.lastReachabilityStatus || (['up', 'down'].includes(m.status) ? m.status : 'unknown'),
-            responseTime: m.responseTime ?? null,
-            lastCheck: m.lastCheck || null,
-            history: Array.isArray(m.history) ? m.history.slice(-60) : [],
-            totalChecks: m.totalChecks || 0,
-            upChecks: m.upChecks || 0,
-            notes: m.notes || ''
-          }));
-          lastGlobalCheck = data.lastGlobalCheck || null;
-          groupOrder = Array.isArray(data.groupOrder) ? [...new Set(data.groupOrder.filter(g => typeof g === 'string').map(groupKey))] : [];
-          logger.log(`Loaded ${monitors.length} monitors from ${DATA_FILE}`);
-          return;
-        }
-      }
+      raw = fs.readFileSync(DATA_FILE, 'utf8');
     } catch (e) {
-      logger.error('Failed to load data file:', e.message);
-      archiveCorruptDataFile();
+      if (e.code === 'ENOENT') {
+        logger.log('No monitor data found. Starting with an empty list.');
+        return;
+      }
+      refuseInvalidData('Data file could not be read');
     }
+    let state;
+    let data;
+    try { data = JSON.parse(raw); }
+    catch { refuseInvalidData('Invalid JSON syntax'); }
+    try { state = validatePersistedState(data); }
+    catch (e) { refuseInvalidData(e.message); }
+    // Adopt only after every record and all global metadata have been verified.
+    monitors = state.monitors;
+    groupOrder = state.groupOrder;
+    lastGlobalCheck = state.lastGlobalCheck;
+    logger.log(`Loaded ${monitors.length} monitors from ${DATA_FILE}`);
+  }
 
-    // No seed data — start completely empty for open-source safety
-    monitors = [];
-    groupOrder = [];
-    lastGlobalCheck = null;
-    logger.log('No monitor data found. Starting with an empty list.');
+  function refuseInvalidData(reason) {
+    logger.error(`${reason}; startup stopped. Restore or repair the data file before restarting.`);
+    archiveCorruptDataFile();
+    throw new Error('Monitor data invalid or unreadable; startup stopped. Original data was not replaced.');
   }
 
   function saveToFile() {
