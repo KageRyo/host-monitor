@@ -29,6 +29,24 @@ test('demo starts with mixed synthetic statuses and consistent totals', async ()
   assert.ok(body.monitors.every(m => m.ip.startsWith('192.0.2.')));
 });
 
+test('demo preserves synthetic error states without counting them as down and clears errors on a valid check', async () => {
+  const { storage } = setup();
+  const state = JSON.parse(storage.getItem());
+  const monitor = state.monitors[0];
+  monitor.status = 'error';
+  monitor.checkError = 'probe_execution_failed';
+  monitor.history = [{ time: new Date().toISOString(), alive: null, rtt: null, error: 'probe_execution_failed' }];
+  const { request } = setup(JSON.stringify(state));
+  const snapshot = (await request('/api/monitors')).body;
+  assert.equal(snapshot.stats.error, 1);
+  assert.equal(snapshot.stats.down, 2);
+  assert.equal(snapshot.stats.unknown, 1);
+  const updated = (await request(`/api/monitors/${monitor.id}/check`, 'POST')).body;
+  assert.equal(updated.checkError, null);
+  assert.notEqual(updated.status, 'error');
+  assert.equal(updated.totalChecks, monitor.totalChecks + 1);
+});
+
 test('host management persists between visits and rejects invalid or duplicate IPv4 targets', async () => {
   const { api, request, storage } = setup();
   assert.equal((await request('/api/monitors', 'POST', { ip: '999.1.1.1' })).status, 400);

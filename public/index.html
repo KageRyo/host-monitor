@@ -40,6 +40,7 @@
     .status-up { background-color: #10b981; }
     .status-down { background-color: #ef4444; }
     .status-unknown { background-color: #94a3b8; }
+    .status-error { background-color: #f59e0b; }
 
     .heartbeat {
       display: flex;
@@ -55,6 +56,7 @@
     }
     .hb-dot.up { background-color: #10b981; }
     .hb-dot.down { background-color: #ef4444; }
+    .hb-dot.error { background-color: #f59e0b; }
     .hb-dot.pending { background-color: #cbd5e1; }
     .dark .hb-dot.pending { background-color: #475569; }
 
@@ -454,6 +456,7 @@
              class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer transition-all ${isActive('all')}">
           <div class="text-xs text-slate-400">總監測數</div>
           <div class="text-4xl font-semibold text-slate-800 dark:text-white mt-1 tabular-nums">${stats.total || 0}</div>
+          ${stats.error ? `<div class="text-xs text-slate-500 mt-1">${stats.error} 個檢查錯誤（不計入離線）</div>` : ''}
         </div>
         <div onclick="setFilter('up')" 
              class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer transition-all ${isActive('up')}">
@@ -559,8 +562,9 @@
 
       recent.forEach(item => {
         const d = document.createElement('div');
-        d.className = `hb-dot ${item.alive ? 'up' : 'down'}`;
-        d.title = `${new Date(item.time).toLocaleTimeString('zh-TW')} · ${item.alive ? '上線' : '離線'}${item.rtt ? ' ' + item.rtt + 'ms' : ''}`;
+        const state = item.error || item.alive === null ? 'error' : item.alive ? 'up' : 'down';
+        d.className = `hb-dot ${state}`;
+        d.title = `${new Date(item.time).toLocaleTimeString('zh-TW')} · ${state === 'error' ? '檢查錯誤（不計入可用率）' : item.alive ? '上線' : '離線'}${item.rtt != null ? ' ' + item.rtt + 'ms' : ''}`;
         container.appendChild(d);
       });
       return container;
@@ -571,6 +575,7 @@
       const uptime = getUptime(monitor);
       const isUp = monitor.status === 'up';
       const isDown = monitor.status === 'down';
+      const isError = monitor.status === 'error';
 
       const card = document.createElement('div');
       card.className = `monitor-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 cursor-pointer`;
@@ -582,9 +587,9 @@
             <div class="ip-text text-emerald-600 dark:text-emerald-400 mt-0.5">${escapeHtml(monitor.ip)}</div>
           </div>
           <div class="flex items-center gap-x-2">
-            <span class="status-dot ${isUp ? 'status-up' : isDown ? 'status-down' : 'status-unknown'}"></span>
+            <span class="status-dot ${isUp ? 'status-up' : isDown ? 'status-down' : isError ? 'status-error' : 'status-unknown'}"></span>
             <span class="text-sm font-semibold ${isUp ? 'text-emerald-600' : isDown ? 'text-rose-600' : 'text-slate-400'}">
-              ${isUp ? '上線' : isDown ? '離線' : '未知'}
+              ${isUp ? '上線' : isDown ? '離線' : isError ? '檢查錯誤' : '未知'}
             </span>
           </div>
         </div>
@@ -602,6 +607,7 @@
           </div>
         </div>
 
+        ${isError ? '<div class="mt-2 text-xs text-slate-500">請檢查監測主機的 ping 工具、權限與設定</div>' : ''}
         ${monitor.notes ? `
         <div class="mt-2 text-xs text-slate-500 dark:text-slate-400 italic truncate" title="${escapeHtml(monitor.notes)}">
           📍 ${escapeHtml(monitor.notes)}
@@ -733,11 +739,12 @@
 
       const badge = document.getElementById('modal-status-badge');
       const isUp = monitor.status === 'up';
+      const isDown = monitor.status === 'down';
       badge.innerHTML = `
         <span class="inline-flex items-center gap-x-2 px-3 py-1 rounded-2xl text-sm font-semibold 
-          ${isUp ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'}">
+          ${isUp ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : isDown ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}">
           <svg aria-hidden="true" class="inline-block w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="${isUp ? 'M5 12l4 4L19 6' : 'M6 6l12 12M18 6 6 18'}"/></svg>
-          ${isUp ? '上線中' : '已離線'}
+          ${isUp ? '上線中' : isDown ? '已離線' : monitor.status === 'error' ? '檢查錯誤：請確認監測主機的 ping 工具與權限' : '未知（尚無有效檢查）'}
         </span>`;
 
       document.getElementById('modal-rtt').innerHTML = monitor.responseTime != null 

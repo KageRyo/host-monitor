@@ -101,6 +101,8 @@ Creating/updating monitors and saving group order require a JSON object. Missing
 
 ## Webhook notifications
 
+Checks distinguish `up`, `down`, `unknown` (not yet measured), and `error` (measurement execution failed). Missing/forbidden ping tools, unexpected probe exceptions, unsupported/unparseable output, abnormal exit codes, and the 5-second process deadline produce `error`, not downtime. A valid no-reply/100% packet-loss result remains `down`. The API exposes `checkError: "probe_execution_failed"` and `stats.error`; the dashboard displays an actionable ping/permissions message without raw process output. Error history entries use `alive: null`, `rtt: null`, and the same error code. They stay in the rolling 60-entry history but do not increment `totalChecks` or `upChecks`, so uptime remains based only on confirmed results (or `null` before any confirmed result). They never trigger status webhooks. The last confirmed reachability is persisted separately, so an eventual confirmed transition still alerts even after errors or a restart; failed saves restore all previous state.
+
 Set `WEBHOOK_ENABLED=true` and `WEBHOOK_URL`, then restart. After successfully persisting a result, the server sends `up→down` and `down→up` transitions. Initial unknown states remain silent by default. Set `WEBHOOK_INITIAL_DOWN=true` to also send one `unknown→down` event when the first check is successfully saved as down; the threshold is one confirmed check. Its payload uses the same `monitor.status_changed` event with `previousStatus: "unknown"` and `status: "down"`. Initial-up, unchanged-down, failed saves, and the demo do not send notifications. Persisted state prevents repeated initial alerts after restart. An HTTP/HTTPS receiver gets this generic JSON:
 
 ```json

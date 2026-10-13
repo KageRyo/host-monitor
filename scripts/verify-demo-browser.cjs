@@ -7,8 +7,12 @@ const root = path.join(__dirname, '..');
 const os = require('node:os');
 const { createApp } = require('../app');
 const liveDir = fs.mkdtempSync(path.join(os.tmpdir(), 'host-monitor-browser-'));
+let failLiveProbe = false;
 const backend = createApp({ dataFile: path.join(liveDir, 'monitors.json'),
-  probe: async () => ({ alive: true, rtt: 7 }), logger: { log() {}, warn() {}, error() {} },
+  probe: async () => {
+    if (failLiveProbe) throw new Error('private probe detail');
+    return { alive: true, rtt: 7 };
+  }, logger: { log() {}, warn() {}, error() {} },
   config: { authEnabled: true, authUsername: 'browser-test', authPassword: 'browser-test-password' } });
 let liveServer;
 // Serve a fixed asset allowlist. Request paths never become filesystem paths.
@@ -265,6 +269,17 @@ const server = http.createServer((req, res) => {
     assert.equal(await live.locator('#modal-uptime').innerText(), '100.0%');
     await live.evaluate(() => checkAllNow());
     assert.equal(JSON.parse(fs.readFileSync(path.join(liveDir, 'monitors.json'))).monitors[0].totalChecks, 2);
+    failLiveProbe = true;
+    await live.evaluate(() => { showDetailModal(currentMonitors[0]); return checkSingleFromModal(); });
+    assert.ok((await live.locator('.monitor-card').innerText()).includes('檢查錯誤'));
+    assert.ok((await live.locator('#modal-status-badge').innerText()).includes('檢查錯誤'));
+    assert.equal(await live.locator('#modal-uptime').innerText(), '100.0%');
+    assert.ok((await live.locator('#global-stats').innerText()).includes('1 個檢查錯誤'));
+    assert.equal(await live.locator('#modal-heartbeat .hb-dot.error').count(), 1);
+    assert.ok(!(await live.locator('#groups-container').innerText()).includes('private probe detail'));
+    failLiveProbe = false;
+    await live.evaluate(() => checkSingleFromModal());
+    assert.ok((await live.locator('#modal-status-badge').innerText()).includes('上線中'));
     await live.evaluate(() => { showDetailModal(currentMonitors[0]); editFromModal(); });
     await live.fill('#form-name', 'Saved edit');
     await live.evaluate(() => submitFormModal());

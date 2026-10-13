@@ -43,11 +43,12 @@
       && Array.isArray(value.groupOrder) && value.groupOrder.every(group => typeof group === 'string')
       && value.monitors.every(m => isIpv4(m.ip) && m.id === m.ip.replaceAll('.', '-')
         && ['name', 'group', 'notes'].every(key => typeof m[key] === 'string')
-        && ['up', 'down', 'unknown'].includes(m.status)
+        && ['up', 'down', 'unknown', 'error'].includes(m.status)
         && Number.isInteger(m.totalChecks) && m.totalChecks >= 0
         && Number.isInteger(m.upChecks) && m.upChecks >= 0 && m.upChecks <= m.totalChecks
         && Array.isArray(m.history) && m.history.length <= 60
-        && m.history.every(item => typeof item.time === 'string' && typeof item.alive === 'boolean'));
+        && m.history.every(item => typeof item.time === 'string' && (typeof item.alive === 'boolean' ||
+          (item.alive === null && item.error === 'probe_execution_failed'))));
   }
 
   function createDemoApi(storage) {
@@ -76,14 +77,16 @@
         .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.name.localeCompare(b.name, 'zh-Hant'));
       const up = monitors.filter(m => m.status === 'up').length;
       const down = monitors.filter(m => m.status === 'down').length;
+      const error = monitors.filter(m => m.status === 'error').length;
 
       return { monitors, isChecking: false, stats: {
-        total: monitors.length, up, down, unknown: monitors.length - up - down,
+        total: monitors.length, up, down, error, unknown: monitors.length - up - down - error,
         avgUptime: averageUptime(monitors), lastGlobalCheck: state.lastGlobalCheck
       } };
     }
 
     function check(monitor, time) {
+      monitor.checkError = null;
       // Repeatable synthetic variation; an entered address is never contacted.
       const number = Number(monitor.ip.split('.').at(-1));
       const alive = (monitor.totalChecks + number) % 11 !== 0;
