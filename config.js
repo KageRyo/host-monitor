@@ -59,6 +59,7 @@ function readConfig(env = process.env, logger = console) {
     manualCheckLimit: integer('MANUAL_CHECK_LIMIT', 10, 1),
     webhookEnabled: readBooleanEnv('WEBHOOK_ENABLED', false, env),
     webhookInitialDown: readBooleanEnv('WEBHOOK_INITIAL_DOWN', false, env),
+    webhookInitialDownThreshold: integer('WEBHOOK_INITIAL_DOWN_THRESHOLD', 1, 1),
     webhookUrl: env.WEBHOOK_URL || '',
     webhookTimeoutMs: integer('WEBHOOK_TIMEOUT_MS', 5000, 1, 2147483647)
   };

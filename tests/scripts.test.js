@@ -52,7 +52,10 @@ test('stop refuses matching node process with wrong recorded start time', async 
 test('start and stop reliably manage the exact Linux helper process', t => {
   const dir = fixture(t);
   const result = run(dir, 'start.sh');
-  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const startupLog = path.join(dir, 'logs/startup.log');
+  const diagnostics = result.stderr + result.stdout +
+    (fs.existsSync(startupLog) ? fs.readFileSync(startupLog, 'utf8') : 'No startup.log was created');
+  assert.equal(result.status, 0, diagnostics);
   const pid = Number(fs.readFileSync(path.join(dir, 'logs/server.pid')));
   t.after(() => { try { process.kill(pid, 'SIGKILL'); } catch {} });
   assert.equal(alive(pid), true);

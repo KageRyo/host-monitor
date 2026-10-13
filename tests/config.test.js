@@ -47,14 +47,16 @@ test('env file is parsed without executing shell and process values take precede
 test('probe limits and webhook timeout reject invalid positive integers', () => {
   const { readConfig } = require('../config');
   for (const invalid of ['0', '-1', 'abc', '1.5', '999999999999999999']) {
-    const config = readConfig({ PROBE_CONCURRENCY: invalid, MAX_MONITORS: invalid, MANUAL_CHECK_LIMIT: invalid, WEBHOOK_TIMEOUT_MS: invalid }, { warn() {} });
+    const config = readConfig({ PROBE_CONCURRENCY: invalid, MAX_MONITORS: invalid, MANUAL_CHECK_LIMIT: invalid, WEBHOOK_TIMEOUT_MS: invalid, WEBHOOK_INITIAL_DOWN_THRESHOLD: invalid }, { warn() {} });
     assert.equal(config.probeConcurrency, 5);
     assert.equal(config.maxMonitors, 100);
     assert.equal(config.manualCheckLimit, 10);
     assert.equal(config.webhookTimeoutMs, 5000);
+    assert.equal(config.webhookInitialDownThreshold, 1);
   }
   assert.equal(readConfig({ WEBHOOK_ENABLED: 'false' }).webhookEnabled, false);
   assert.equal(readConfig({ WEBHOOK_ENABLED: 'true' }).webhookEnabled, true);
+  assert.equal(readConfig({ WEBHOOK_INITIAL_DOWN_THRESHOLD: '3' }).webhookInitialDownThreshold, 3);
 });
 
 test('unreadable env file warns without breaking startup', t => {
