@@ -66,6 +66,12 @@ Edit the sample addresses and names to match your devices. Stop the server befor
 
 Only IPv4 addresses are accepted by the dashboard API. Hostnames and IPv6 addresses are not currently supported.
 
+### Data validation and recovery
+
+Startup validates the complete JSON document before loading any monitor: IPv4/ID consistency and uniqueness, string fields, status/error fields, nonnegative safe-integer counters and their relationship to history, RTTs, timestamps, a maximum of 60 well-formed history entries, and string group order. Valid legacy files may omit IDs and optional fields; IDs are derived from IPv4 addresses, omitted counters are inferred from valid history, and category aliases/order duplicates normalize as before.
+
+If existing data is malformed, invalid, or unreadable, startup stops before HTTP listening or checks. The original file is never replaced or truncated; a uniquely named `data/monitors.json.corrupt-<timestamp>-<uuid>` copy is attempted, and copy failure is explicitly logged while startup still stops. Only a genuinely missing file starts empty. To recover, stop the service, keep the original and archived copies, repair the invalid document or restore a known-good backup to `data/monitors.json`, then restart. There is no automatic partial discard or unchecked backup fallback. Keep separate backups; the corrupt copy is a recoverable source, not a verified working snapshot.
+
 ## Configuration
 
 Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing process environment variables take precedence over values in `.env`.
