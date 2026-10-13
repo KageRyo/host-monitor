@@ -58,6 +58,7 @@ function readConfig(env = process.env, logger = console) {
     maxMonitors: integer('MAX_MONITORS', 100, 1),
     manualCheckLimit: integer('MANUAL_CHECK_LIMIT', 10, 1),
     webhookEnabled: readBooleanEnv('WEBHOOK_ENABLED', false, env),
+    webhookInitialDown: readBooleanEnv('WEBHOOK_INITIAL_DOWN', false, env),
     webhookUrl: env.WEBHOOK_URL || '',
     webhookTimeoutMs: integer('WEBHOOK_TIMEOUT_MS', 5000, 1, 2147483647)
   };

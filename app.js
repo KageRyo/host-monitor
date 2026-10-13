@@ -186,7 +186,9 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     updateMonitor(monitor, result);
     const saved = saveToFile();
     if (!saved) Object.assign(monitor, previous);
-    if (saved && ['up', 'down'].includes(previousStatus) && previousStatus !== monitor.status) {
+    const initialDown = config.webhookInitialDown && previousStatus === 'unknown' && monitor.status === 'down';
+    const changedReachability = ['up', 'down'].includes(previousStatus) && previousStatus !== monitor.status;
+    if (saved && (initialDown || changedReachability)) {
       notifier.notify({ event: 'monitor.status_changed',
         monitor: { id: monitor.id, ip: monitor.ip, name: monitor.name, group: monitor.group },
         previousStatus, status: monitor.status, checkedAt: monitor.lastCheck,
