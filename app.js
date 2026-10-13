@@ -36,6 +36,7 @@ function updateMonitor(monitor, result) {
   monitor.checkError = result.error || null;
   monitor.responseTime = result.rtt;
   monitor.lastCheck = now.toISOString();
+  if (result.error || result.alive) monitor.initialDownChecks = 0;
 
   if (!result.error) {
     monitor.lastReachabilityStatus = monitor.status;
@@ -165,15 +166,27 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
     const previous = { ...monitor, history: monitor.history.slice() };
     const previousStatus = monitor.lastReachabilityStatus || (['up', 'down'].includes(monitor.status) ? monitor.status : 'unknown');
     updateMonitor(monitor, result);
+    let initialDown = false;
+    if (!result.error && monitor.initialDownPending) {
+      if (result.alive || !config.webhookEnabled || !config.webhookInitialDown) {
+        monitor.initialDownPending = false;
+        monitor.initialDownChecks = 0;
+      } else {
+        monitor.initialDownChecks++;
+        if (monitor.initialDownChecks >= config.webhookInitialDownThreshold) {
+          initialDown = true;
+          monitor.initialDownPending = false;
+        }
+      }
+    }
     if (result.error) logger.warn('Probe execution failed; check ping installation, permissions, and monitoring-node configuration');
     const saved = saveToFile();
     if (!saved) Object.assign(monitor, previous);
-    const initialDown = config.webhookInitialDown && previousStatus === 'unknown' && monitor.status === 'down';
     const changedReachability = !result.error && ['up', 'down'].includes(previousStatus) && previousStatus !== monitor.status;
     if (saved && (initialDown || changedReachability)) {
       notifier.notify({ event: 'monitor.status_changed',
         monitor: { id: monitor.id, ip: monitor.ip, name: monitor.name, group: monitor.group },
-        previousStatus, status: monitor.status, checkedAt: monitor.lastCheck,
+        previousStatus: initialDown ? 'unknown' : previousStatus, status: monitor.status, checkedAt: monitor.lastCheck,
         responseTime: monitor.responseTime });
     }
     return saved;
@@ -350,6 +363,8 @@ function createApp({ dataFile = path.join(__dirname, 'data', 'monitors.json'),
       status: 'unknown',
       checkError: null,
       lastReachabilityStatus: 'unknown',
+      initialDownPending: true,
+      initialDownChecks: 0,
       responseTime: null,
       lastCheck: null,
       history: [],

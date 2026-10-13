@@ -21,7 +21,9 @@ test('invalid parseable files stop startup and preserve both original bytes and 
     { ...valid, history: [{ time: new Date().toISOString(), alive: 'false' }] },
     { ...valid, history: Array(61).fill({ time: new Date().toISOString(), alive: false, rtt: null }) },
     { ...valid, history: [{ time: new Date().toISOString(), alive: true }], totalChecks: 0 },
-    { ...valid, lastReachabilityStatus: 'error' }, { ...valid, checkError: 'raw secret error' }
+    { ...valid, lastReachabilityStatus: 'error' }, { ...valid, checkError: 'raw secret error' },
+    { ...valid, initialDownPending: 'true' }, { ...valid, initialDownChecks: -1 },
+    { ...valid, initialDownChecks: 1, totalChecks: 0 }
   ];
   const files = [null, [], {}, { monitors: {} }, { monitors: [valid, valid] },
     { monitors: [valid], groupOrder: {} }, { monitors: [valid], groupOrder: [null] },

@@ -88,6 +88,7 @@ cp monitors.example.json data/monitors.json
 | `MANUAL_CHECK_LIMIT` | `10` | 每程序每 60 秒允許的手動檢查請求數，兩個端點共用 |
 | `WEBHOOK_ENABLED` | `false` | 啟用通用 JSON webhook |
 | `WEBHOOK_INITIAL_DOWN` | `false` | 也通知首次 unknown 轉為 down 的結果 |
+| `WEBHOOK_INITIAL_DOWN_THRESHOLD` | `1` | 一次性初始警報所需的連續確認離線次數 |
 | `WEBHOOK_URL` | 空白 | HTTP／HTTPS 接收端網址 |
 | `WEBHOOK_TIMEOUT_MS` | `5000` | 每次通知的逾時，1–2147483647 毫秒 |
 
@@ -107,7 +108,7 @@ cp monitors.example.json data/monitors.json
 
 檢查區分 `up`、`down`、`unknown`（尚未測量）與 `error`（測量執行失敗）。缺少 ping 工具、權限不足、非預期例外、不支援或無法解析的輸出、異常結束碼與 5 秒程序期限都記為 `error`，不當作離線；有效的無回覆／100% 封包遺失結果仍為 `down`。API 提供 `checkError: "probe_execution_failed"` 與 `stats.error`；dashboard 提示檢查監測主機的 ping 與權限，不公開原始程序輸出。錯誤歷史使用 `alive: null`、`rtt: null` 與相同錯誤碼，保留在最近 60 筆歷史中，但不增加 `totalChecks`、`upChecks`，可用率只計算有效結果（尚無有效結果時為 `null`）。錯誤不觸發 webhook；最後確認的可達狀態另外保存，因此錯誤或重啟後首次確認的狀態變化仍能通知。儲存失敗會回復所有先前狀態。
 
-設定 `WEBHOOK_ENABLED=true` 與 `WEBHOOK_URL`，重新啟動後啟用。結果成功儲存後，在 `up→down`、`down→up` 發送通知；首次未知狀態預設不通知。設定 `WEBHOOK_INITIAL_DOWN=true` 可在首次檢查成功儲存為 down 時發送一次 `unknown→down` 通知，門檻為一次已確認的檢查。沿用 `monitor.status_changed` 事件，payload 使用 `previousStatus: "unknown"` 與 `status: "down"`。首次 up、持續 down、儲存失敗與 demo 均不通知；已儲存的狀態會防止重啟後重複首次警報。HTTP／HTTPS 接收端收到以下 JSON：
+設定 `WEBHOOK_ENABLED=true` 與 `WEBHOOK_URL`，重新啟動後啟用。結果成功儲存後，在 `up→down`、`down→up` 發送通知；首次未知狀態預設不通知。設定 `WEBHOOK_INITIAL_DOWN=true` 可在連續確認離線次數達到 `WEBHOOK_INITIAL_DOWN_THRESHOLD`（正整數，預設 1）後，發送一次初始離線通知。dashboard 仍立即顯示 down，門檻只延後初始通知。沿用 `monitor.status_changed` 事件，payload 使用 `previousStatus: "unknown"` 與 `status: "down"`，`checkedAt` 對應達門檻的檢查。進度跨重啟保留；執行錯誤重設連續計數，儲存失敗則回復計數。首次 up 會結束初始政策，後續一般狀態轉換仍立即通知。首次 up、已通知後持續 down、儲存失敗與 demo 均不通知；已儲存的狀態防止重啟後重複初始警報，已檢查的舊檔主機不補發初始警報。HTTP／HTTPS 接收端收到以下 JSON：
 
 ```json
 {"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}

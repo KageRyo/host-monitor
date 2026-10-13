@@ -47,9 +47,15 @@ function validatePersistedState(data) {
       : m.lastReachabilityStatus;
     requireValid(['up', 'down', 'unknown'].includes(lastReachabilityStatus) &&
       (!['up', 'down'].includes(status) || lastReachabilityStatus === status), 'confirmed status');
+    const initialDownPending = m.initialDownPending === undefined
+      ? totalChecks === 0 && lastReachabilityStatus === 'unknown' : m.initialDownPending;
+    const initialDownChecks = m.initialDownChecks === undefined ? 0 : m.initialDownChecks;
+    requireValid(typeof initialDownPending === 'boolean' && counter(initialDownChecks) && initialDownChecks <= totalChecks &&
+      (!initialDownPending || upChecks === 0 && status !== 'up'), 'initial-down progress');
     return {
       id, ip, name: m.name || ip, group: groupKey(m.group), notes: m.notes || '', status,
       checkError: m.checkError || null, lastReachabilityStatus,
+      initialDownPending, initialDownChecks,
       responseTime: m.responseTime ?? null, lastCheck: m.lastCheck ?? null,
       history: history.map(entry => ({ ...entry, rtt: entry.rtt ?? null })), totalChecks, upChecks
     };
