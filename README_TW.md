@@ -5,6 +5,9 @@
 輕量、適合自架的 IPv4 主機監測儀表板，可用於伺服器、NAS、印表機與其他設備。後端從部署主機執行 ICMP ping，網頁顯示在線狀態、回應時間、可用率與最近檢查紀錄。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/KageRyo/host-monitor?display_name=tag)](https://github.com/KageRyo/host-monitor/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/demo-pages.yml?branch=main&label=CI)](https://github.com/KageRyo/host-monitor/actions/workflows/demo-pages.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=KageRyo_server-monitor&metric=alert_status)](https://sonarcloud.io/dashboard?id=KageRyo_server-monitor)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#資料與日誌)
@@ -114,7 +117,7 @@ cp monitors.example.json data/monitors.json
 {"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}
 ```
 
-通知背景發送，最多 2 個工作與 100 筆等待事件；滿載丟棄新事件並記錄警告。逾時或 HTTP 失敗不阻塞監測、不重試；重啟會丟失等待事件。無效 URL 會停用通知並記錄不含秘密的警告。URL、token 與回應內容不寫入日誌。第一版無連續失敗門檻、冷卻或持久化重送；Discord／Slack 請使用接收通用 JSON 的轉接服務。
+通知背景發送，最多 2 個工作與 100 筆等待事件；滿載丟棄新事件並記錄警告。逾時或 HTTP 失敗不阻塞監測、不重試；重啟會丟失等待事件。無效 URL 會停用通知並記錄不含秘密的警告。URL、token 與回應內容不寫入日誌。可設定的連續失敗門檻僅適用於初始離線通知，後續確認的狀態變化立即通知；不提供冷卻或持久化重送。Discord／Slack 請使用接收通用 JSON 的轉接服務。
 
 ## 資料與日誌
 

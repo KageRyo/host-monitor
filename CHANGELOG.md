@@ -2,41 +2,45 @@
 
 ## Unreleased
 
-## 0.2.0 — 2026-10-08
+## 0.1.0 — 2026-10-14
 
-- Omit framework disclosure headers and resolve backend SonarCloud review findings.
-- Add isolated integration tests for the real Express backend, probe scheduling, persistence errors, configuration, Linux helpers, and generic webhooks.
-- Fix reserved category keys, built-in/legacy category normalization, ordering deduplication, and malformed/non-object JSON validation.
-- Validate HTTP port and check interval; preserve 0ms RTT when reloading saved results.
-- **API compatibility:** `stats.avgUptime` is now `null` when no monitors have recorded checks; consumers must handle this value.
-- Show unknown uptime as `—`, exclude unchecked hosts from averages, and return `stats.avgUptime: null` when no checks exist.
-- Handle non-2xx, proxy, and network errors consistently in dashboard actions without success toasts or lost forms.
-- Bound shared probe concurrency (default 5), prevent duplicate probes, cap new monitors (default 100), and rate-limit manual requests (default 10/minute) with 409/429 responses.
-- Verify Linux process identity before TERM/KILL; remove broad process-name termination and clean stale PID records safely.
-- Add opt-in generic JSON webhook notifications on persisted up/down transitions, with timeout, bounded delivery, and safe logs.
-- Expand browser verification to cover real backend/data flows and error responses; document configuration and compatibility in both READMEs.
-
-## 0.1.0
-
-First tagged release of Host Monitor.
+First published release of Host Monitor. Earlier development version labels were not published releases; this entry describes the complete initial release.
 
 ### Monitoring and dashboard
 
-- Self-hosted IPv4 reachability checks using ICMP ping, with a configurable interval and manual single-host or all-host checks.
-- Grouped status cards with response times, cumulative uptime percentages, and recent heartbeat history.
-- Host creation, editing, and deletion with custom categories, category ordering, and notes.
-- Online/offline filters, light and dark themes, and a responsive Traditional Chinese interface.
-- Local JSON persistence, atomic data writes, corrupted-data backups, and rotating logs.
+- Self-hosted IPv4 ICMP reachability checks with configurable intervals, bounded probe concurrency, and manual single-host or all-host checks.
+- Grouped cards with response times, cumulative uptime, a rolling 60-entry heartbeat history, online/offline filters, light/dark themes, and a responsive Traditional Chinese interface.
+- Host creation, editing, deletion, custom categories, notes, and persisted category ordering that survives mode exit, polling, and reload; failed saves restore the persisted order.
+- Distinguish confirmed `up`/`down` from `unknown` and probe execution `error`; failed measurements remain visible but do not count as downtime or affect uptime counters. Preserve genuine no-reply results, including Windows destination-unreachable responses.
+- Unchecked hosts show `—`; `stats.avgUptime` is `null` before any confirmed checks. Preserve valid 0ms RTTs.
+- Handle HTTP, persistence, proxy, and network failures without misleading success messages or discarded form state.
 
-### Demo and documentation
+### Configuration, storage, and access
 
-- An interactive GitHub Pages demo with synthetic hosts, simulated checks, browser-local persistence, and reset.
-- English and Traditional Chinese READMEs with direct demo links, a dashboard screenshot, setup instructions, and deployment guidance.
-- Project metadata aligned with the `host-monitor` repository and the `0.1.0` release version.
+- Configurable IPv4 `HOST` binding (default `0.0.0.0`), validated port/interval settings, and binding-aware startup URLs.
+- Opt-in HTTP Basic authentication protecting the complete dashboard and all APIs; reject misconfigured credentials and cross-site browser writes. Document HTTPS reverse-proxy deployment and a proxy-only alternative.
+- Local JSON storage with atomic writes, rollback on failed persistence, and complete record/schema validation before loading. Invalid or unreadable existing data stops startup, preserves the original, and attempts a recoverable archival copy.
+- Valid legacy files normalize optional fields, category aliases, and group ordering. No real monitor inventory or credentials are bundled.
+- Configurable monitor caps and process-wide manual-check quotas with actionable 409/429 responses.
+- Rotating logs and Linux helpers that verify process start time, cwd, and the Node entrypoint before signaling; clean stale records without terminating unrelated processes.
 
-### Verification
+### Notifications
 
-- Node.js tests for the demo transport and browser checks for dashboard interactions, persistence, mobile layout, and normal API routing.
-- GitHub Actions tests, static-demo builds, and deployment from `main` using pinned actions.
+- Opt-in generic JSON webhooks for successfully persisted reachability transitions, with bounded delivery, timeouts, and redacted failure logs.
+- Optional one-time initial-down alerts with a configurable consecutive-failure threshold; persist progress across restart, reset it on execution errors, and roll back failed writes.
+- Measurement errors never trigger reachability alerts; retain the last confirmed state across errors and reloads. Notifications have no cooldown or durable retry queue.
 
-The public demo simulates reachability. Real ping checks require a self-hosted server. The application has no built-in authentication; deployment guidance covers access on trusted networks and behind an authenticated reverse proxy.
+### Demo, documentation, and verification
+
+- Public GitHub Pages demo with synthetic hosts, browser-local persistence, simulated checks, and reset; entered addresses are never contacted.
+- Bundled CSS, inline SVG icons, and system fonts for offline self-hosted operation without runtime CDN dependencies.
+- English and Traditional Chinese READMEs, dashboard screenshot, configuration/recovery guidance, and Release, CI, and SonarCloud badges.
+- Node.js integration tests for real backend behavior, configuration, storage, probes, notifications, demo semantics, and Linux helpers; browser regressions for authenticated real-backend flows, errors/recovery, and category-order races.
+- Compatible runtime dependency security updates and pinned GitHub Actions for verification and Pages deployment.
+
+### Deployment notes
+
+- Authentication is disabled by default for trusted-network compatibility. Network binding and rate limits do not authenticate callers; enable authentication and use HTTPS before remote access.
+- API consumers must handle `status: "error"`, `checkError: "probe_execution_failed"`, `stats.error`, nullable uptime, and error history entries with `alive: null`.
+- Keep backups. Invalid persisted data requires deliberate repair or a verified backup before restarting.
+- Runtime dependency audit is clean at release preparation. Seven build-only Tailwind dependency advisories remain; npm's proposed remediation requires a Tailwind v4 migration.
