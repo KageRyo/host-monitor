@@ -4,6 +4,56 @@ const http = require('node:http');
 const fs = require('node:fs');
 const { setup } = require('./helpers');
 
+for (const enabled of [false, true]) {
+  test(`initial-down policy ${enabled ? 'enabled' : 'disabled'} emits once and preserves recovery`, async t => {
+    const events = [];
+    const url = await receiver(t, (req, res) => {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => { events.push(JSON.parse(body)); res.end(); });
+    });
+    const states = [false, false, true, true, false];
+    const { request } = await setup(t, { config: { webhookEnabled: true, webhookUrl: url, webhookInitialDown: enabled },
+      probe: async () => ({ alive: states.shift(), rtt: null }) });
+    await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+    for (let i = 0; i < 5; i++) await request('/api/monitors/192-0-2-1/check', 'POST');
+    await waitFor(() => events.length >= (enabled ? 3 : 2));
+    assert.deepEqual(events.map(e => [e.previousStatus, e.status]), enabled
+      ? [['unknown', 'down'], ['down', 'up'], ['up', 'down']]
+      : [['down', 'up'], ['up', 'down']]);
+  });
+}
+
+test('initial-down policy ignores initial-up and failed writes, then alerts after successful retry', async t => {
+  const events = [];
+  const url = await receiver(t, (req, res) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => { events.push(JSON.parse(body)); res.end(); });
+  });
+  let alive = true;
+  const { request, dataFile } = await setup(t, { config: { webhookEnabled: true, webhookUrl: url, webhookInitialDown: true },
+    probe: async () => ({ alive, rtt: null }) });
+  await request('/api/monitors', 'POST', { ip: '192.0.2.1' });
+  await request('/api/monitors/192-0-2-1/check', 'POST');
+  await request('/api/monitors', 'POST', { ip: '192.0.2.2' });
+  const saved = fs.readFileSync(dataFile);
+  fs.unlinkSync(dataFile); fs.mkdirSync(dataFile);
+  alive = false;
+  assert.equal((await request('/api/monitors/192-0-2-2/check', 'POST')).status, 500);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(events.length, 0);
+  fs.rmdirSync(dataFile); fs.writeFileSync(dataFile, saved);
+  await request('/api/monitors/192-0-2-2/check', 'POST');
+  await waitFor(() => events.length === 1);
+  assert.deepEqual([events[0].previousStatus, events[0].status], ['unknown', 'down']);
+  const reloaded = await setup(t, { dataFile, config: { webhookEnabled: true, webhookUrl: url, webhookInitialDown: true },
+    probe: async () => ({ alive: false, rtt: null }) });
+  await reloaded.request('/api/monitors/192-0-2-2/check', 'POST');
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(events.length, 1);
+});
+
 async function receiver(t, handle) {
   const server = http.createServer(handle);
   server.listen(0, '127.0.0.1');

@@ -85,6 +85,7 @@ Copy [.env.example](.env.example) to `.env` to customize the defaults. Existing 
 | `MAX_MONITORS`       | `100`                                   | Limit on new monitors; existing excess data remains monitored               |
 | `MANUAL_CHECK_LIMIT` | `10`                                    | Process-wide manual requests per 60 seconds, shared by both check endpoints |
 | `WEBHOOK_ENABLED`    | `false`                                 | Enable generic JSON webhook notifications                                   |
+| `WEBHOOK_INITIAL_DOWN` | `false`                               | Also notify on the initial unknown-to-down result                          |
 | `WEBHOOK_URL`        | Empty                                   | HTTP/HTTPS receiver URL                                                     |
 | `WEBHOOK_TIMEOUT_MS` | `5000`                                  | Notification timeout, 1–2147483647 milliseconds                             |
 
@@ -100,7 +101,7 @@ Creating/updating monitors and saving group order require a JSON object. Missing
 
 ## Webhook notifications
 
-Set `WEBHOOK_ENABLED=true` and `WEBHOOK_URL`, then restart. After successfully persisting a result, the server sends only `up→down` and `down→up` transitions. Initial unknown states, unchanged states, and the demo do not send notifications. An HTTP/HTTPS receiver gets this generic JSON:
+Set `WEBHOOK_ENABLED=true` and `WEBHOOK_URL`, then restart. After successfully persisting a result, the server sends `up→down` and `down→up` transitions. Initial unknown states remain silent by default. Set `WEBHOOK_INITIAL_DOWN=true` to also send one `unknown→down` event when the first check is successfully saved as down; the threshold is one confirmed check. Its payload uses the same `monitor.status_changed` event with `previousStatus: "unknown"` and `status: "down"`. Initial-up, unchanged-down, failed saves, and the demo do not send notifications. Persisted state prevents repeated initial alerts after restart. An HTTP/HTTPS receiver gets this generic JSON:
 
 ```json
 {"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}

@@ -81,6 +81,7 @@ cp monitors.example.json data/monitors.json
 | `MAX_MONITORS` | `100` | 新增主機上限；既有超量資料仍保留並監測 |
 | `MANUAL_CHECK_LIMIT` | `10` | 每程序每 60 秒允許的手動檢查請求數，兩個端點共用 |
 | `WEBHOOK_ENABLED` | `false` | 啟用通用 JSON webhook |
+| `WEBHOOK_INITIAL_DOWN` | `false` | 也通知首次 unknown 轉為 down 的結果 |
 | `WEBHOOK_URL` | 空白 | HTTP／HTTPS 接收端網址 |
 | `WEBHOOK_TIMEOUT_MS` | `5000` | 每次通知的逾時，1–2147483647 毫秒 |
 
@@ -96,7 +97,7 @@ cp monitors.example.json data/monitors.json
 
 ## Webhook 通知
 
-設定 `WEBHOOK_ENABLED=true` 與 `WEBHOOK_URL`，重新啟動後啟用。結果成功儲存後，只在 `up→down`、`down→up` 發送通知；首次未知狀態、相同狀態與 demo 不發送。HTTP／HTTPS 接收端收到以下 JSON：
+設定 `WEBHOOK_ENABLED=true` 與 `WEBHOOK_URL`，重新啟動後啟用。結果成功儲存後，在 `up→down`、`down→up` 發送通知；首次未知狀態預設不通知。設定 `WEBHOOK_INITIAL_DOWN=true` 可在首次檢查成功儲存為 down 時發送一次 `unknown→down` 通知，門檻為一次已確認的檢查。沿用 `monitor.status_changed` 事件，payload 使用 `previousStatus: "unknown"` 與 `status: "down"`。首次 up、持續 down、儲存失敗與 demo 均不通知；已儲存的狀態會防止重啟後重複首次警報。HTTP／HTTPS 接收端收到以下 JSON：
 
 ```json
 {"event":"monitor.status_changed","monitor":{"id":"192-0-2-1","ip":"192.0.2.1","name":"Router","group":"server"},"previousStatus":"up","status":"down","checkedAt":"2026-10-08T00:00:00.000Z","responseTime":null}
