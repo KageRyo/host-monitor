@@ -342,6 +342,12 @@
     let refreshTimer = null;
     let currentFilter = 'all'; // 'all' | 'up' | 'down'
     let isReorderMode = false;
+    let persistedGroupOrder = [];
+    let draftGroupOrder = null;
+    let pendingGroupSave = null;
+    let groupOrderRevision = 0;
+    let refreshSerial = 0;
+    let appliedRefreshSerial = 0;
 
     // ==================== 主題切換（亮色 / 暗色） ====================
     function getSavedTheme() {
@@ -481,6 +487,7 @@
     }
 
     function setFilter(filter) {
+      if (isReorderMode && filter !== 'all') return;
       currentFilter = filter;
       if (window.lastStats) {
         renderGlobalStats(window.lastStats);
@@ -489,46 +496,78 @@
     }
 
     // ==================== 群組排序功能 ====================
+    function monitorGroupOrder(monitors) {
+      return [...new Set(monitors.map(m => m.group || 'server'))];
+    }
+
+    function applyGroupOrder(monitors, order) {
+      const ranks = new Map(order.map((group, index) => [group, index]));
+      return monitors.slice().sort((a, b) =>
+        (ranks.get(a.group || 'server') ?? order.length) - (ranks.get(b.group || 'server') ?? order.length));
+    }
+
+    function updateReorderControls() {
+      document.getElementById('reorder-btn').disabled = Boolean(pendingGroupSave);
+      document.querySelectorAll('#groups-container [data-move]').forEach(button => {
+        button.disabled = Boolean(pendingGroupSave);
+      });
+    }
+
     async function toggleReorderMode() {
+      if (pendingGroupSave) await pendingGroupSave;
       isReorderMode = !isReorderMode;
+      groupOrderRevision++;
 
       const btn = document.getElementById('reorder-btn');
       if (isReorderMode) {
+        currentFilter = 'all';
+        if (window.lastStats) renderGlobalStats(window.lastStats);
+        draftGroupOrder = monitorGroupOrder(currentMonitors);
         btn.classList.add('bg-emerald-100', 'dark:bg-emerald-900/30', 'border-emerald-400');
         btn.classList.remove('border-slate-200', 'dark:border-slate-700');
       } else {
         btn.classList.remove('bg-emerald-100', 'dark:bg-emerald-900/30', 'border-emerald-400');
         btn.classList.add('border-slate-200', 'dark:border-slate-700');
-        // 離開排序模式時儲存
-        await saveGroupOrder();
+        draftGroupOrder = null;
+        currentMonitors = applyGroupOrder(currentMonitors, persistedGroupOrder);
       }
 
       renderGroups(currentMonitors);
     }
 
-    async function saveGroupOrder() {
-      try {
-        const sections = document.querySelectorAll('#groups-container > div');
-        const order = [];
-
-        sections.forEach(section => {
-          const key = section.dataset.internalGroup;
-          if (key) order.push(key);
-        });
-
-        await apiRequest('/api/groups/order', {
+    function saveGroupOrder() {
+      if (pendingGroupSave) return pendingGroupSave;
+      const order = Array.from(document.querySelectorAll('#groups-container > div'), section => section.dataset.internalGroup);
+      draftGroupOrder = order;
+      currentMonitors = applyGroupOrder(currentMonitors, order);
+      groupOrderRevision++;
+      pendingGroupSave = apiRequest('/api/groups/order', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ order })
-        });
-
+        }).then(result => {
+        persistedGroupOrder = result.order || order;
+        draftGroupOrder = isReorderMode ? persistedGroupOrder.slice() : null;
+        currentMonitors = applyGroupOrder(currentMonitors, persistedGroupOrder);
+        groupOrderRevision++;
+        renderGroups(currentMonitors);
         showToast('群組順序已儲存');
-      } catch (e) {
+      }).catch(e => {
+        draftGroupOrder = isReorderMode ? persistedGroupOrder.slice() : null;
+        currentMonitors = applyGroupOrder(currentMonitors, persistedGroupOrder);
+        groupOrderRevision++;
+        renderGroups(currentMonitors);
         showApiError(e, '儲存順序失敗');
-      }
+      }).finally(() => {
+        pendingGroupSave = null;
+        updateReorderControls();
+      });
+      updateReorderControls();
+      return pendingGroupSave;
     }
 
     async function moveGroupByInternal(internalKey, direction) {
+      if (pendingGroupSave) return pendingGroupSave;
       const sections = Array.from(document.querySelectorAll('#groups-container > div'));
       const currentIndex = sections.findIndex(s => s.dataset.internalGroup === internalKey);
 
@@ -657,15 +696,8 @@
         groupMap.get(internal).items.push(m);
       });
 
-      // 取得目前要顯示的 internal groups，並依照 groupOrder 或預設排序
-      let internalGroups = Array.from(groupMap.keys());
-
-      // 如果有自訂 groupOrder，就優先使用它
-      // 注意：這裡我們讓後端已經處理好排序，所以直接用出現順序即可
-      // 為了簡單，我們在這裡維持 DOM 順序（由後端回傳的 monitors 順序決定）
-
-      // 為了支援前端即時排序，我們還是需要手動排序 internalGroups
-      // 暫時先維持簡單：如果不在 reorder 模式，就信任後端順序
+      // currentMonitors is ordered by the latest draft or persisted category order.
+      const internalGroups = Array.from(groupMap.keys());
 
       let hasAny = false;
 
@@ -714,13 +746,24 @@
       });
 
       document.getElementById('empty-state').classList.toggle('hidden', hasAny);
+      updateReorderControls();
     }
 
     // ==================== 重新整理 ====================
     async function refreshUI(silent = false) {
+      const serial = ++refreshSerial;
+      const revision = groupOrderRevision;
       try {
         const data = await apiRequest(`${API_BASE}/monitors`);
-        currentMonitors = data.monitors || [];
+        if (serial < appliedRefreshSerial) return;
+        appliedRefreshSerial = serial;
+        const snapshot = data.monitors || [];
+        if (isReorderMode || pendingGroupSave || revision !== groupOrderRevision) {
+          currentMonitors = applyGroupOrder(snapshot, draftGroupOrder || persistedGroupOrder);
+        } else {
+          currentMonitors = snapshot;
+          persistedGroupOrder = monitorGroupOrder(snapshot);
+        }
         window.lastStats = data.stats || {};
         renderGlobalStats(window.lastStats);
         renderGroups(currentMonitors);
