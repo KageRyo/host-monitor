@@ -61,7 +61,11 @@ func SystemProbe(ctx context.Context, ip string) Result {
 		args = []string{"-n", "-c", "1", "-W", "3000", ip}
 		unreachable = 2
 	}
-	cmd := exec.CommandContext(ctx, "ping", args...)
+	executable := "/bin/ping"
+	if runtime.GOOS == "darwin" {
+		executable = "/sbin/ping"
+	}
+	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Env = append(os.Environ(), "LANG=C", "LC_ALL=C")
 	var out, stderr cappedBuffer
 	cmd.Stdout = &out

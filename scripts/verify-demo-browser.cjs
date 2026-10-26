@@ -379,7 +379,7 @@ const server = http.createServer((req, res) => {
     await browser.close();
     server.close();
     backend?.close?.();
-    for (const cleanup of goCleanups.splice(0)) await cleanup();
+    await Promise.all(goCleanups.splice(0).map(cleanup => cleanup()));
     if (liveServer) { liveServer.closeAllConnections(); await new Promise(resolve => liveServer.close(resolve)); }
     fs.rmSync(liveDir, { recursive: true, force: true });
   }

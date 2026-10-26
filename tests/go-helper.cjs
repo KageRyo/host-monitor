@@ -44,7 +44,8 @@ async function setupGo(t, options = {}) {
     fs.rmSync(dir, { recursive: true, force: true });
   });
   await ready;
-  async function request(url, method = 'GET', body) {
+  async function request(url, method, body) {
+    if (method === undefined) method = 'GET';
     const response = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     return { status: response.status, body: await response.json(), headers: response.headers };
   }

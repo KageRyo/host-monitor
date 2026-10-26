@@ -67,14 +67,14 @@ func ReadConfig(get func(string) (string, bool)) (Config, error) {
 		}
 		return d
 	}
-	integer := func(k string, d, min, max int) int {
+	integer := func(k string, d, minimum, maximum int) int {
 		raw, ok := get(k)
 		if !ok {
 			return d
 		}
 		raw = trimJS(raw)
 		n, e := strconv.ParseUint(raw, 10, 53)
-		if raw == "" || strings.ContainsAny(raw, "+-") || e != nil || n < uint64(min) || n > uint64(max) {
+		if raw == "" || strings.ContainsAny(raw, "+-") || e != nil || n < uint64(minimum) || n > uint64(maximum) {
 			log.Printf("Invalid %s; using default %d", k, d)
 			return d
 		}

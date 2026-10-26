@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Linux /proc comparison of unchanged Node and production Go, on loopback only.
-Run: python3 scripts/benchmark.py --go /tmp/host-monitor-go
+Run: python3 scripts/benchmark.py --go /tmp/host-monitor-go > docs/benchmark-results.json
 Requires Node dependencies and system ping. Never reads/writes the user's data/.
 """
 import argparse
+import sys
 import http.client
 import hashlib
 from datetime import datetime, timezone
@@ -19,7 +20,6 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPORT_FILE = ROOT / 'docs' / 'benchmark-results.json'
 TICKS = os.sysconf('SC_CLK_TCK')
 
 
@@ -164,8 +164,8 @@ def main():
             for impl in (['node', 'go'] if repetition % 2 == 0 else ['go', 'node']):
                 row = sample(impl, binary, mode, args.seconds)
                 result['samples'].append(row)
-                print(json.dumps(row), flush=True)
-    REPORT_FILE.write_text(json.dumps(result, indent=2) + '\n')
+                print(json.dumps(row), file=sys.stderr, flush=True)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == '__main__':

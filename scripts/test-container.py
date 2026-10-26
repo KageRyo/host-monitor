@@ -41,7 +41,7 @@ try:
             try:
                 if request('/api/health')['ok']:
                     return
-            except (OSError, urllib.error.URLError):
+            except OSError:
                 pass
             time.sleep(.1)
         raise RuntimeError('container did not become healthy: ' + docker('inspect', container, '--format', '{{json .State}}') + docker('logs', container))

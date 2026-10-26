@@ -10,7 +10,7 @@ performance guarantee. Raw measurements and input hashes are in
 ```sh
 npm ci --include=dev --ignore-scripts
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o /tmp/host-monitor-go .
-python3 scripts/benchmark.py --go /tmp/host-monitor-go
+python3 scripts/benchmark.py --go /tmp/host-monitor-go > docs/benchmark-results.json
 ```
 
 Requires Linux `/proc`, Python 3, Node 22 and system ping. The runner copies the
