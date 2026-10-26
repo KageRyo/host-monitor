@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Linux /proc comparison of unchanged Node and production Go, on loopback only.
-Run: python3 scripts/benchmark.py --go /tmp/host-monitor-go --output docs/benchmark-results.json
+Run: python3 scripts/benchmark.py --go /tmp/host-monitor-go
 Requires Node dependencies and system ping. Never reads/writes the user's data/.
 """
 import argparse
@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+REPORT_FILE = ROOT / 'docs' / 'benchmark-results.json'
 TICKS = os.sysconf('SC_CLK_TCK')
 
 
@@ -135,7 +136,6 @@ def sample(impl, binary, mode, seconds):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--go', required=True, type=Path)
-    p.add_argument('--output', default='docs/benchmark-results.json', type=Path)
     p.add_argument('--seconds', type=float, default=5)
     p.add_argument('--repetitions', type=int, default=3)
     args = p.parse_args()
@@ -165,7 +165,7 @@ def main():
                 row = sample(impl, binary, mode, args.seconds)
                 result['samples'].append(row)
                 print(json.dumps(row), flush=True)
-    args.output.write_text(json.dumps(result, indent=2) + '\n')
+    REPORT_FILE.write_text(json.dumps(result, indent=2) + '\n')
 
 
 if __name__ == '__main__':

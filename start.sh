@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start Host Monitor as a detached Linux process.
 cd -- "$(dirname -- "$0")" || exit 1
-[ -x ./host-monitor ] || { echo "Build first: go build -o host-monitor ." >&2; exit 1; }
+[[ -x ./host-monitor ]] || { echo "Build first: go build -o host-monitor ." >&2; exit 1; }
 mkdir -p logs data || exit 1
 source scripts/process-identity.sh
 stop_recorded_process || exit 1
