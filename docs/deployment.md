@@ -4,7 +4,8 @@
 
 Build with Go 1.27.3 (`go build -o host-monitor .`), or extract the release archive
 for your operating system and architecture. Go embeds the checked-in frontend;
-you do not need Node.js/npm. Linux also needs `iputils-ping` (Debian/Ubuntu:
+you do not need Node.js/npm. Linux probes execute the system `/bin/ping` directly
+instead of searching PATH. Linux also needs `iputils-ping` (Debian/Ubuntu:
 `sudo apt install iputils-ping`). Windows uses its native IP Helper API.
 
 Run `./host-monitor` (Windows: `.\host-monitor.exe`) from the existing installation

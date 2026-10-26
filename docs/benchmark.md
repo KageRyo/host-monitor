@@ -1,6 +1,6 @@
 # Node → Go benchmark
 
-Measured 2026-10-26T01:52:51.244105+00:00 on Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43, 12th Gen Intel(R) Core(TM) i7-12700KF.
+Measured 2026-10-26T02:23:12.393528+00:00 on Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43, 12th Gen Intel(R) Core(TM) i7-12700KF.
 Node v22.23.4; go version go1.27.3 linux/amd64. These are local WSL2 results, not a general
 performance guarantee. Raw measurements and input hashes are in
 [benchmark-results.json](benchmark-results.json).
@@ -18,7 +18,9 @@ unchanged Node sources into temporary directories, uses the same dependencies as
 the original app, and starts the real `server.js`. Go runs its production binary.
 Both use isolated JSON files, the same loopback targets, probe concurrency 5,
 auth/webhooks disabled, file logging enabled, stdout logging disabled and normal
-persistence after every result. Existing configuration/data are never read.
+persistence after every result. Log verbosity follows each implementation: Node
+logs batch start/end messages; Go logs lifecycle events and errors. Existing
+configuration/data are never read.
 
 - Idle: 20 hosts, 60000 ms interval, sampled after the initial batch completes.
 - Active: 100 distinct loopback IPv4 hosts, 1000 ms interval; all probes are real
@@ -45,28 +47,29 @@ Values below are medians across the three mode runs, not precision estimates.
 
 | Mode | Measurement | Node | Go | Unit |
 | --- | --- | ---: | ---: | --- |
-| idle | Service RSS | 67.434 | 12.766 | MiB |
+| idle | Service RSS | 67.363 | 12.379 | MiB |
 | idle | Service CPU | 0.000 | 0.000 | % of one core |
 | idle | CPU including reaped ping children | 0.000 | 0.000 | % of one core |
-| idle | GET /api/monitors p50 | 0.447 | 0.213 | ms |
-| idle | GET /api/monitors p95 | 0.710 | 0.282 | ms |
-| active | Service RSS | 83.492 | 14.371 | MiB |
-| active | Service CPU | 11.768 | 11.766 | % of one core |
-| active | CPU including reaped ping children | 20.344 | 16.553 | % of one core |
-| active | GET /api/monitors p50 | 0.772 | 0.446 | ms |
-| active | GET /api/monitors p95 | 0.979 | 0.903 | ms |
+| idle | GET /api/monitors p50 | 0.462 | 0.215 | ms |
+| idle | GET /api/monitors p95 | 0.770 | 0.307 | ms |
+| active | Service RSS | 82.992 | 14.285 | MiB |
+| active | Service CPU | 12.964 | 11.965 | % of one core |
+| active | CPU including reaped ping children | 22.737 | 17.149 | % of one core |
+| active | GET /api/monitors p50 | 0.815 | 0.443 | ms |
+| active | GET /api/monitors p95 | 1.239 | 0.853 | ms |
 
-Startup median: **75.92 ms Node → 5.13 ms Go**.
+Startup median: **105.00 ms Node → 5.97 ms Go**.
 Executable size: **119.12 MiB Node → 8.97 MiB Go**.
 The Node value is its executable only, excluding JS sources, node_modules,
 frontend files and any shared system libraries; the Go value includes the
 frontend and collation tables. This is an executable comparison, not a total
-installation or container comparison. The tested Go Alpine image is 28193947
-bytes (uncompressed Docker image size); no Node image size claim is made.
+installation or container comparison. The [hosted container smoke test](https://github.com/KageRyo/host-monitor/actions/runs/40258661295/job/121365967296)
+reported 18444711 bytes from Docker image inspection on its Linux runner. No Node
+image comparison or cross-engine container size improvement is claimed.
 
-For these workloads, median service RSS fell about 81% idle and 83% active;
-startup was about 15 times faster. Active CPU in the service process was
-essentially equal. Counting ping children, CPU fell about 19%. Idle CPU in both
+For these workloads, median service RSS fell about 82% idle and 83% active;
+startup was about 18 times faster. Active CPU in the service process was about
+8% lower in this run; counting ping children, CPU fell about 25%. Idle CPU in both
 implementations rounded to zero at the sample resolution, so there is no evidence
 of an idle CPU improvement. API latency improved in this sample, but it is
 sub-millisecond loopback traffic and should not be extrapolated to WAN use.
@@ -90,6 +93,6 @@ measure large history files, unreachable networks, hundreds of slow probes,
 long-running heap behavior, or production disk durability under power failure.
 No performance claim is made for those unmeasured conditions.
 
-The source commit in the raw report identifies the unchanged Node baseline;
-the runtime source hash identifies the uncommitted Go implementation plus assets
-and module lockfiles used in the measurement. The binary SHA-256 is recorded too.
+The source commit in the raw report identifies the revision containing both the
+unchanged Node sources and the Go implementation. The runtime source hash covers
+the Go implementation, assets and module lockfiles used in the measurement. The binary SHA-256 is recorded too.
