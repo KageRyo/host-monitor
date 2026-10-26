@@ -1,6 +1,6 @@
 {
   "name": "host-monitor",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A self-hosted Go service for monitoring hosts, NAS devices and printers.",
   "scripts": {
     "start": "go run .",

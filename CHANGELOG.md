@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.2.0 — 2026-10-26
+
+### Go service and deployment
+
+- Replace the production Node.js/Express backend with a standalone Go executable that embeds the existing dashboard. Node/npm are only needed for frontend development, retained legacy tests and benchmarking.
+- Preserve the JSON configuration/history schema, API payloads, cumulative uptime, 60-entry history, categories, manual checks, optional Basic authentication and webhooks. Keep the original Node implementation available for rollback.
+- Share one bounded probe queue between automatic and manual checks; cancel and drain work during graceful shutdown, preserve monitor identity across deletion/recreation, and restore memory when atomic persistence fails.
+- Use a fixed system ping path on Linux and native Windows ICMP without requiring administrator privileges. Keep execution errors separate from confirmed downtime.
+- Add a non-root Docker image, Compose/systemd instructions, and reproducible Linux/Windows amd64/arm64 archives with SHA-256 checksums and third-party notices.
+- Verify Linux/Windows race checks, API/storage compatibility, real dashboard interactions, container restart persistence and byte-identical repeated builds in CI. Publish archives only after release gates pass.
+
+### Measured performance
+
+- Add a reproducible Node/Go comparison with raw samples, source/binary hashes, memory, CPU, startup and API latency measurements. Results and qualifications are in [docs/benchmark.md](docs/benchmark.md); they do not establish performance improvements on unmeasured systems.
+
+### Upgrade notes and limits
+
+- Stop the old service and back up `.env` and `data/monitors.json` before upgrading. Run Go from the existing installation directory, or supply `--dir`, to retain configuration and history. Never run both implementations against the same file.
+- Linux requires system `/bin/ping` with suitable unprivileged ICMP permissions. Windows uses the native IP Helper API. ARM64 archives are cross-compiled; the native CI/runtime checks cover amd64.
+- Rare/new Unicode characters may sort differently from newer Node ICU tables. API requests must use uncompressed UTF-8 JSON without a BOM; Express-specific compressed/alternate-charset request decoding is not provided. See [docs/migration.md](docs/migration.md).
+
 ## 0.1.0 — 2026-10-14
 
 First published release of Host Monitor. Earlier development version labels were not published releases; this entry describes the complete initial release.
