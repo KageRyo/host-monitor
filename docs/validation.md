@@ -46,5 +46,6 @@ standalone binary. The previous Node checkout and rollback backups remain intact
 The runtime executable hash is
 `d9171a88ac21999dbf063b163ce25babca97b2fd679fc0a5cf6cc8cb22205f9f`.
 Inventory files, credentials, host addresses and deployment backups are not
-committed. The application remains on the migration PR; no merge, tag or release
-publication has been performed.
+committed. The migration was merged as PR #43 at `412206e18ed0cda5ce2c1591471b7f28461862b1`
+after hosted validation. Version-tag workflows publish release archives only
+after all release gates pass.
