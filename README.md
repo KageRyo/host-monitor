@@ -6,10 +6,10 @@ A lightweight, self-hosted dashboard for checking whether servers, NAS devices, 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/KageRyo/host-monitor?display_name=tag)](https://github.com/KageRyo/host-monitor/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/demo-pages.yml?branch=main&label=CI)](https://github.com/KageRyo/host-monitor/actions/workflows/demo-pages.yml)
+[![Go CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/go.yml?branch=main&label=Go%20CI)](https://github.com/KageRyo/host-monitor/actions/workflows/go.yml)
+[![Demo CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/demo-pages.yml?branch=main&label=Demo%20CI)](https://github.com/KageRyo/host-monitor/actions/workflows/demo-pages.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=KageRyo_server-monitor&metric=alert_status)](https://sonarcloud.io/dashboard?id=KageRyo_server-monitor)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#data-and-logs)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
@@ -34,27 +34,36 @@ Unchecked hosts show `—` for uptime and are excluded from the global average. 
 
 ## Quick start
 
-You need Node.js 18 or newer, npm, and a working system `ping` command. The Bash helpers also require `setsid` and standard Linux process utilities; use `npm start` for foreground execution on other platforms with a compatible ping utility.
+The production service is a standalone Go executable with the dashboard embedded.
+Build with Go 1.27.3, or extract a release archive. Linux requires a working
+`iputils-ping`; Windows uses the native ICMP API and does not need administrator
+privileges or a separate ping tool. Node/npm are only for frontend development,
+the retained legacy tests and performance comparison.
 
 ```bash
 git clone https://github.com/KageRyo/host-monitor.git
 cd host-monitor
-npm ci --omit=dev --ignore-scripts
-npm start
+go build -o host-monitor .
+./host-monitor
 ```
 
-Open `http://localhost:3000`. The application starts with an empty monitor list. Use **新增主機** (Add host) to enter an IPv4 address, name, category, and optional notes.
+On Windows use `go build -o host-monitor.exe .` then `.\host-monitor.exe`.
+Open `http://localhost:3000` and add an IPv4 target. Existing `.env` and
+`data/monitors.json` work unchanged: stop the Node service first, back up data,
+and run Go from the same directory. Use `--dir /path` for explicit data/config paths.
+See [migration details](docs/migration.md), [measured performance](docs/benchmark.md)
+and [binary, Docker and systemd deployment](docs/deployment.md).
 
-For background execution on Linux:
+Linux background helpers (`setsid` and `/proc` required):
 
 ```bash
 ./start.sh
 ./stop.sh
 ```
 
-`start.sh` prints the local URL and stores the process ID in `logs/server.pid` and process start time in `logs/server.identity`. LAN URLs are recorded in `logs/monitor.log`.
-
-Before signaling, the helpers verify process start time, cwd, and the Node entrypoint. Stale or mismatched records are cleaned without signaling unrelated processes. Before upgrading, stop the old service through its existing process manager; the new helpers refuse to kill legacy processes without an identity record.
+The helpers record PID/start-time/executable identity in `logs/` and only stop the
+exact Go binary they started. Legacy Node instances must be stopped through their
+original process manager. Startup and LAN URLs are recorded in `logs/monitor.log`.
 
 ## Add targets from a file
 
@@ -168,16 +177,7 @@ monitor.example.com {
 
 Replace the placeholders before deploying; never put a plaintext password in committed proxy configuration, query strings, or logs. The public GitHub Pages demo is intentionally unauthenticated and uses only synthetic browser-local data. Built-in Basic auth provides one shared account; it does not provide roles, sessions, or brute-force rate limiting. Use the proxy's access controls and rate limiting when needed.
 
-For a process manager, run `server.js` directly. For example, with [PM2](https://pm2.keymetrics.io/):
-
-```bash
-npm install -g pm2
-pm2 start server.js --name host-monitor
-pm2 save
-pm2 startup
-```
-
-Follow the command printed by `pm2 startup` to configure startup on your system.
+For long-running installations, see the [systemd and Docker examples](docs/deployment.md).
 
 ## Interactive demo
 
@@ -205,39 +205,36 @@ The [Demo Pages workflow](.github/workflows/demo-pages.yml) tests and builds the
 2. Merge the demo change into `main`, or run **Actions → Demo Pages → Run workflow** on `main` if it is already merged.
 3. After a successful deployment, open [the demo](https://kageryo.github.io/host-monitor/).
 
-The URL becomes available after Pages is enabled and the first deployment succeeds. See [GitHub's custom workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for setup details. Real ICMP checks and the Node.js API still require a self-hosted server.
+The URL becomes available after Pages is enabled and the first deployment succeeds. See [GitHub's custom workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for setup details. Real ICMP checks and the Go API still require a self-hosted server.
 
 ## Development
 
-The backend uses Express 5 and the `ping` package. The dashboard uses vanilla JavaScript and Tailwind CSS, with locally generated CSS, inline SVG icons, and system fonts. No external CSS, icon, or font CDN is required at runtime.
-
-Install the development dependencies:
+The backend uses Go's standard HTTP, process, JSON and concurrency libraries.
+`golang.org/x/text` preserves Traditional Chinese collation; no database is needed.
+The vanilla JavaScript/Tailwind frontend and all runtime assets remain local.
 
 ```bash
-npm install
+go test -race ./...
+go vet ./...
+go run .
 ```
 
-To regenerate the stylesheet after changing frontend styles, run:
+For frontend development and migration regression checks (Node 22, npm, Python 3,
+and a C compiler for race-instrumented Go tests):
 
 ```bash
-npm run build:css
-```
-
-The demo build runs this CSS build automatically and copies the required frontend assets into `demo-dist/`:
-
-```bash
-npm run build:demo
-```
-
-Run the tests and start the server during development:
-
-```bash
+npm ci --include=dev --ignore-scripts
 npm test
-node --check server.js
-npm start
+npm run test:go-contract
+npm run browser:install -- --with-deps
+TEST_BROWSER=1 npm run test:go-contract
 ```
 
-`npm test` uses Node.js’s built-in runner for separate backend, demo, configuration, scheduler, Linux helper, and webhook suites. Backend data lives in temporary directories, probes are mocked, and notifications use local HTTP receivers; no real ICMP or external service is needed. CI also runs `npm run test:browser` for demo interactions, real API/data flows, and failure UI.
+Use `npm run build:css` after style changes and `npm run build:demo` for the static
+Pages demo. Frontend assets are checked in and embedded by `go build`; Node is not
+required for production builds. `npm run start:legacy` retains the original Node
+backend for rollback and comparison; never run it against a live Go data file.
+See [verification coverage and compatibility limits](docs/migration.md).
 
 ## License
 

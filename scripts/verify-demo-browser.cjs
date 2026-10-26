@@ -8,12 +8,14 @@ const os = require('node:os');
 const { createApp } = require('../app');
 const liveDir = fs.mkdtempSync(path.join(os.tmpdir(), 'host-monitor-browser-'));
 let failLiveProbe = false;
-const backend = createApp({ dataFile: path.join(liveDir, 'monitors.json'),
+const liveOptions = { dataFile: path.join(liveDir, 'monitors.json'),
   probe: async () => {
     if (failLiveProbe) throw new Error('private probe detail');
     return { alive: true, rtt: 7 };
   }, logger: { log() {}, warn() {}, error() {} },
-  config: { authEnabled: true, authUsername: 'browser-test', authPassword: 'browser-test-password' } });
+  config: { authEnabled: true, authUsername: 'browser-test', authPassword: 'browser-test-password' } };
+let backend = process.env.GO_BACKEND ? null : createApp(liveOptions);
+const goCleanups = [];
 let liveServer;
 // Serve a fixed asset allowlist. Request paths never become filesystem paths.
 const assets = new Map();
@@ -255,10 +257,16 @@ const server = http.createServer((req, res) => {
     assert.equal(await failure.evaluate(() => window.testToasts.at(-1).error), true);
     assert.equal(await failure.locator('.monitor-card').count(), 1);
 
-    // Browser → actual Express routes → isolated JSON file, with a mocked ICMP boundary.
-    liveServer = backend.app.listen(0, '127.0.0.1');
-    await new Promise(resolve => liveServer.once('listening', resolve));
-    const liveOrigin = `http://127.0.0.1:${liveServer.address().port}`;
+    // Browser → actual backend routes → isolated JSON file, with a mocked ICMP boundary.
+    let liveOrigin;
+    if (process.env.GO_BACKEND) {
+      backend = await require('../tests/go-helper.cjs').setupGo({ after: fn => goCleanups.push(fn) }, liveOptions);
+      liveOrigin = backend.base;
+    } else {
+      liveServer = backend.app.listen(0, '127.0.0.1');
+      await new Promise(resolve => liveServer.once('listening', resolve));
+      liveOrigin = `http://127.0.0.1:${liveServer.address().port}`;
+    }
     assert.equal((await fetch(liveOrigin + '/')).status, 401);
     assert.equal((await fetch(liveOrigin + '/api/monitors')).status, 401);
     const live = await browser.newPage({ httpCredentials: { username: 'browser-test', password: 'browser-test-password' } });
@@ -370,8 +378,9 @@ const server = http.createServer((req, res) => {
   } finally {
     await browser.close();
     server.close();
-    backend.close();
+    backend?.close?.();
+    for (const cleanup of goCleanups.splice(0)) await cleanup();
     if (liveServer) { liveServer.closeAllConnections(); await new Promise(resolve => liveServer.close(resolve)); }
     fs.rmSync(liveDir, { recursive: true, force: true });
   }
-})().catch(error => { console.error(error); backend.close(); server.close(); fs.rmSync(liveDir, { recursive: true, force: true }); process.exitCode = 1; });
+})().catch(error => { console.error(error); backend?.close?.(); server.close(); fs.rmSync(liveDir, { recursive: true, force: true }); process.exitCode = 1; });

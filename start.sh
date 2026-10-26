@@ -1,11 +1,11 @@
 #!/bin/bash
 # Start Host Monitor as a detached Linux process.
 cd -- "$(dirname -- "$0")" || exit 1
+[ -x ./host-monitor ] || { echo "Build first: go build -o host-monitor ." >&2; exit 1; }
 mkdir -p logs data || exit 1
 source scripts/process-identity.sh
 stop_recorded_process || exit 1
-PORT_VALUE=$(node -e "const c = require('./config'); c.loadEnvFile(); console.log(c.readConfig().port)") || exit 1
-setsid node server.js > logs/startup.log 2>&1 < /dev/null &
+setsid ./host-monitor > logs/startup.log 2>&1 < /dev/null &
 NEW_PID=$!
 # Give exec/setsid time to establish the expected identity.
 for ((attempt=0; attempt<20; attempt++)); do
@@ -22,7 +22,6 @@ printf '%s\n' "$START_TIME" > "$IDENTITY_FILE"
 sleep 2
 if is_expected_process "$NEW_PID" "$START_TIME"; then
   echo "✅ 主機監測系統已啟動 (PID: $NEW_PID)"
-  echo "   http://localhost:${PORT_VALUE}"
   echo '   區域網路網址請查看 logs/monitor.log'
 else
   clear_identity
