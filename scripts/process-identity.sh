@@ -22,11 +22,11 @@ is_expected_process() {
   cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null) || return 1
   [ "$cwd" = "$PROCESS_ROOT" ] || return 1
   exe=$(readlink -f "/proc/$pid/exe" 2>/dev/null) || return 1
-  [ "${exe##*/}" = node ] || return 1
+  [ "$exe" = "$PROCESS_ROOT/host-monitor" ] || return 1
   local args=()
   mapfile -d '' -t args < "/proc/$pid/cmdline" 2>/dev/null || return 1
-  [ "${#args[@]}" -eq 2 ] || return 1
-  [[ "${args[1]}" = server.js || "${args[1]}" = "$PROCESS_ROOT/server.js" ]]
+  [ "${#args[@]}" -eq 1 ] || return 1
+  [[ "${args[0]}" = ./host-monitor || "${args[0]}" = "$PROCESS_ROOT/host-monitor" ]]
 }
 
 clear_identity() { rm -f -- "$PID_FILE" "$IDENTITY_FILE"; }
@@ -47,7 +47,7 @@ stop_recorded_process() {
   fi
   echo "正在停止主機監測系統 (PID: $pid)..."
   kill -TERM -- "$pid" 2>/dev/null || return 1
-  for ((attempt=0; attempt<30; attempt++)); do
+  for ((attempt=0; attempt<150; attempt++)); do
     if ! is_expected_process "$pid" "$expected"; then
       clear_identity
       echo '✅ 已停止'

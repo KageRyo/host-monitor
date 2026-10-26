@@ -6,10 +6,10 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/KageRyo/host-monitor?display_name=tag)](https://github.com/KageRyo/host-monitor/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/demo-pages.yml?branch=main&label=CI)](https://github.com/KageRyo/host-monitor/actions/workflows/demo-pages.yml)
+[![Go CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/go.yml?branch=main&label=Go%20CI)](https://github.com/KageRyo/host-monitor/actions/workflows/go.yml)
+[![Demo CI](https://img.shields.io/github/actions/workflow/status/KageRyo/host-monitor/demo-pages.yml?branch=main&label=Demo%20CI)](https://github.com/KageRyo/host-monitor/actions/workflows/demo-pages.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=KageRyo_server-monitor&metric=alert_status)](https://sonarcloud.io/dashboard?id=KageRyo_server-monitor)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Storage](https://img.shields.io/badge/storage-local_JSON-blue)](#資料與日誌)
 [![GitHub stars](https://img.shields.io/github/stars/KageRyo/host-monitor?style=flat)](https://github.com/KageRyo/host-monitor/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/KageRyo/host-monitor)](https://github.com/KageRyo/host-monitor/commits)
@@ -32,27 +32,28 @@
 
 ## 快速開始
 
-需要 Node.js 18 以上、npm 與可用的系統 `ping` 指令。Bash 啟停腳本另需 `setsid` 及 Linux 程序管理工具；其他平台可在具備相容 ping 工具時使用 `npm start` 前景執行。
+正式服務改為 Go 獨立執行檔，內嵌原有 dashboard。可使用 Go 1.27.3 編譯，或解壓縮對應平台的 release。Linux 需要系統 `iputils-ping`；Windows 使用原生 ICMP API，不需管理員權限。Node/npm 僅用於前端開發、保留的舊版測試與效能比較。
 
 ```bash
 git clone https://github.com/KageRyo/host-monitor.git
 cd host-monitor
-npm ci --omit=dev --ignore-scripts
-npm start
+go build -o host-monitor .
+./host-monitor
 ```
 
-開啟 `http://localhost:3000`。首次啟動的主機清單為空，點擊「新增主機」輸入 IPv4 位址、名稱、類別與備註。
+Windows 使用 `go build -o host-monitor.exe .`，再執行 `.\host-monitor.exe`。
+開啟 `http://localhost:3000` 新增 IPv4 主機。升級前先停止 Node 服務並備份資料；從原目錄執行 Go 即可沿用 `.env` 與 `data/monitors.json`，也可用 `--dir /路徑` 指定設定與資料目錄。
 
-Linux 背景執行：
+參閱[遷移與相容性說明](docs/migration.md)、[實測效能報告](docs/benchmark.md)及[二進位、Docker、systemd 部署](docs/deployment.md)。
+
+Linux 背景執行（需 `setsid` 與 `/proc`）：
 
 ```bash
 ./start.sh
 ./stop.sh
 ```
 
-`start.sh` 顯示本機網址，PID 與程序啟動時間分別儲存於 `logs/server.pid`、`logs/server.identity`；區域網路網址記錄於 `logs/monitor.log`。
-
-腳本送出訊號前會核對程序啟動時間、cwd 與 Node 入口；失效或身分不符的記錄只會清理，不會依名稱搜尋並終止程序。升級舊版前請先透過原本的程序管理方式停止服務；新腳本不會終止缺少身分記錄的舊程序。
+腳本核對 PID、啟動時間與 Go 執行檔身分，只停止自己啟動的服務；舊 Node 服務請透過原本的程序管理方式停止。啟動與區域網路網址記錄於 `logs/monitor.log`。
 
 ## 從檔案匯入目標
 
@@ -160,16 +161,7 @@ monitor.example.com {
 
 部署前請替換範例值；不要把明文密碼放進版控中的代理設定、網址或日誌。公開 GitHub Pages demo 刻意不使用認證，僅操作瀏覽器內的合成資料。內建 Basic 認證只有單一共用帳號，不提供角色、session 或登入暴力嘗試的速率限制；有需要時請搭配代理的存取控制與速率限制。
 
-長期執行可用 [PM2](https://pm2.keymetrics.io/) 直接管理 `server.js`：
-
-```bash
-npm install -g pm2
-pm2 start server.js --name host-monitor
-pm2 save
-pm2 startup
-```
-
-依 `pm2 startup` 印出的指令完成系統啟動設定。
+長期部署請參閱 [systemd 與 Docker 範例](docs/deployment.md)。
 
 ## 互動 Demo
 
@@ -197,41 +189,31 @@ python3 -m http.server 8080 --directory demo-dist
 2. 將 demo 變更合併到 `main`；若已合併，可在 **Actions → Demo Pages → Run workflow** 選擇 `main` 手動執行。
 3. 部署成功後開啟 [demo](https://kageryo.github.io/host-monitor/)。
 
-網址會在啟用 Pages 且首次部署成功後可用。設定細節見 [GitHub 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。真正的 ICMP 檢查與 Node.js API 仍需自架後端。
+網址會在啟用 Pages 且首次部署成功後可用。設定細節見 [GitHub 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。真正的 ICMP 檢查與 Go API 仍需自架後端。
 
 ## 開發
 
-後端使用 Express 5 與 `ping` 套件；前端使用 Vanilla JavaScript 與 Tailwind CSS，搭配本地生成的 CSS、inline SVG 圖示與系統字型。執行時不需要外部 CSS、圖示或字型 CDN。
-
-安裝開發依賴：
+後端主要使用 Go 標準函式庫，僅以 `golang.org/x/text` 提供繁中排序，不使用資料庫。原有 JavaScript、Tailwind 前端與本機資產維持不變。
 
 ```bash
-npm install
+go test -race ./...
+go vet ./...
+go run .
 ```
 
-修改前端樣式後，重新生成樣式表：
+前端與遷移回歸測試需要 Node 22、npm、Python 3；Go race 測試另需 C 編譯器：
 
 ```bash
-npm run build:css
-```
-
-Demo 建置會先執行 CSS 建置，再將所需前端資產複製到 `demo-dist/`：
-
-```bash
-npm run build:demo
-```
-
-執行測試並啟動開發伺服器：
-
-```bash
+npm ci --include=dev --ignore-scripts
 npm test
-node --check server.js
-npm start
-npm run build:css
-npm run build:demo
+npm run test:go-contract
+npm run browser:install -- --with-deps
+TEST_BROWSER=1 npm run test:go-contract
 ```
 
-`npm test` 使用 Node.js 內建測試工具，分開驗證正式後端、demo、設定、排程、Linux 腳本與 webhook。後端資料寫入臨時目錄，ping 使用 mock，通知使用本機 HTTP receiver，不需真實 ICMP 或外部服務。CI 另執行 `npm run test:browser`，驗證 demo、正式 API 的完整流程與錯誤畫面。
+修改樣式後執行 `npm run build:css`；靜態 Pages demo 使用 `npm run build:demo`。前端資產已納入版控，正式 Go 編譯與執行不需要 Node。`npm run start:legacy` 保留原 Node 後端作為回退與比較用途，請勿與 Go 共用正在寫入的資料檔。
+
+完整[驗證範圍與相容性限制](docs/migration.md)另有說明。
 
 ## License
 

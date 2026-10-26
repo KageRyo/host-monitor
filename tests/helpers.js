@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 async function setup(t, options = {}) {
+  if (process.env.GO_BACKEND) return require('./go-helper.cjs').setupGo(t, options);
   const { createApp } = require('../app');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'host-monitor-test-'));
   const dataFile = path.join(dir, 'data', 'monitors.json');

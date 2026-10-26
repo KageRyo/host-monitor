@@ -1,0 +1,20 @@
+services:
+  monitor:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - monitor-data:/app/data
+      - monitor-logs:/app/logs
+    # ICMP datagram sockets work as a regular user when the host allows this GID.
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+volumes:
+  monitor-data:
+  monitor-logs:

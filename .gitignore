@@ -30,3 +30,9 @@ yarn-error.log*
 
 # Generated GitHub Pages demo
 demo-dist/
+
+# Go build and verification output
+/host-monitor
+/host-monitor.exe
+/dist/
+/output/

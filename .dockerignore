@@ -1,0 +1,12 @@
+.git
+.remember
+node_modules
+data
+logs
+.env
+.env.*.local
+dist
+host-monitor
+host-monitor.exe
+demo-dist
+output
